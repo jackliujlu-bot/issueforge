@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Read PORTING.md first
+    url: https://github.com/jackliujlu-bot/issueforge/blob/main/docs/PORTING.md
+    about: |
+      Trying to set up IssueForge on your own repo? PORTING.md is the only
+      guide you should need; it has a "When something goes wrong" cheat sheet.
+  - name: Read ARCHITECTURE.md
+    url: https://github.com/jackliujlu-bot/issueforge/blob/main/docs/ARCHITECTURE.md
+    about: |
+      Wondering how IssueForge works internally? Start here.

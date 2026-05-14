@@ -1,0 +1,197 @@
+# IssueForge-recommended CI workflow for the *business repo* the worker
+# operates on. Copy this file to `.github/workflows/ci.yml` in your repo.
+#
+# Why we recommend this shape:
+#
+#   1. The agent's wall-clock budget is finite (typical max_agent_rounds=3).
+#      A heavy CI matrix (5+ Python versions, codecov upload, self-hosted
+#      runners, fail-fast watcher) often goes red for reasons orthogonal to
+#      the agent's diff (codecov token, flake on one Python version,
+#      runner unavailability). The worker treats every red CI as "the diff
+#      needs more work" and burns retries on a problem the agent can't fix.
+#
+#   2. This workflow is the minimal viable gate:
+#        - `lint`: pre-commit + (optional) mypy. Catches the cheap stuff.
+#        - `tests-changed`: only runs pytest on tests sibling to the .py
+#          files the PR actually changes. Skips entirely on docs-only PRs.
+#        - `ci-complete`: aggregate status check, the one your branch
+#          protection rule should target.
+#
+#   3. Skipped jobs are treated as green (via re-actors/alls-green) — that's
+#      what makes docs-only PRs pass without running pytest.
+#
+# Replace the `{...}` placeholders for your repo. Anything not marked
+# is project-agnostic.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - '**.md'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  lint:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      # If your project uses a `lint` dependency group:
+      - name: Install lint dependencies
+        run: uv sync --only-group lint --frozen
+      # If you don't have a separate group, replace the line above with:
+      #   run: uv sync --frozen
+
+      # Optional: run mypy if you use type checking
+      - name: Mypy
+        run: uv run mypy
+        continue-on-error: false  # set true if your repo isn't fully typed yet
+
+      # pre-commit covers ruff-format / ruff-check / trailing-whitespace /
+      # markdown link rewriting / etc. Requires `.pre-commit-config.yaml`
+      # in your repo root.
+      - name: Run pre-commit
+        uses: pre-commit/action@v3.0.1
+
+  tests-changed:
+    # Runs ONLY pytest tests sibling to the .py files this PR changes.
+    # Skips entirely if no .py files changed. This is the cheap version of
+    # "test only what's affected" — for full coverage either re-introduce a
+    # nightly matrix workflow or trust your code-reviewer process.
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # need history for `git diff` against the base
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"  # ← change to your project's primary Python version
+
+      - name: Find changed .py files vs base
+        id: changed_py
+        shell: bash
+        run: |
+          set -e
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base_ref="origin/${{ github.base_ref }}"
+            git fetch --depth=1 origin "${{ github.base_ref }}" 2>/dev/null || true
+          else
+            base_ref="${{ github.event.before }}"
+          fi
+          if ! git rev-parse "$base_ref" >/dev/null 2>&1; then
+            base_ref="HEAD~1"
+          fi
+          git diff --name-only "$base_ref...HEAD" \
+            | grep -E '\.py$' \
+            > /tmp/changed_py.txt || true
+          n=$(wc -l < /tmp/changed_py.txt | tr -d ' ')
+          echo "Changed .py count: $n"
+          if [ "$n" -gt 0 ]; then
+            echo "any=true" >> "$GITHUB_OUTPUT"
+            cat /tmp/changed_py.txt
+          else
+            echo "any=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip pytest (no .py changes)
+        if: steps.changed_py.outputs.any == 'false'
+        run: echo "No Python files changed; skipping pytest."
+
+      - name: Map .py files to sibling test files
+        if: steps.changed_py.outputs.any == 'true'
+        id: targets
+        shell: bash
+        run: |
+          targets=()
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$(basename "$f")" in
+              test_*.py|*_test.py)
+                [ -f "$f" ] && targets+=("$f")
+                continue
+                ;;
+            esac
+            dir=$(dirname "$f")
+            base=$(basename "$f" .py)
+            for cand in \
+                "$dir/test_${base}.py" \
+                "$dir/${base}_test.py" \
+                "$dir/tests/test_${base}.py"; do
+              [ -f "$cand" ] && targets+=("$cand")
+            done
+          done < /tmp/changed_py.txt
+
+          if [ ${#targets[@]} -eq 0 ]; then
+            echo "any=false" >> "$GITHUB_OUTPUT"
+            echo "No sibling test files mapped."
+          else
+            uniq=$(printf '%s\n' "${targets[@]}" | sort -u | tr '\n' ' ')
+            echo "list=$uniq" >> "$GITHUB_OUTPUT"
+            echo "any=true" >> "$GITHUB_OUTPUT"
+            echo "Will run pytest on:"
+            printf ' - %s\n' "${targets[@]}" | sort -u
+          fi
+
+      - name: Skip pytest (no test files matched)
+        if: steps.changed_py.outputs.any == 'true' && steps.targets.outputs.any != 'true'
+        run: echo "Changed .py files have no sibling test_*.py / tests/test_*.py; skipping."
+
+      - name: Install test dependencies
+        if: steps.targets.outputs.any == 'true'
+        run: uv sync --group tests --frozen
+        # If your project uses extras instead of dependency groups, replace
+        # the line above with:
+        #   run: uv sync --extra tests --frozen
+        # or just:
+        #   run: uv sync --frozen
+
+      - name: Run pytest on mapped tests only
+        if: steps.targets.outputs.any == 'true'
+        run: |
+          uv run pytest \
+            -x \
+            --timeout=120 \
+            --no-cov \
+            ${{ steps.targets.outputs.list }}
+
+  ci-complete:
+    # Branch-protection target. Stays green iff lint AND tests-changed both
+    # succeed (or are skipped, which `re-actors/alls-green` treats as success
+    # — that's the intended behavior for docs-only PRs that bypass
+    # `tests-changed` via the no-.py path).
+    if: always()
+    needs:
+      - lint
+      - tests-changed
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Decide whether the needed jobs succeeded or failed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}

@@ -1,0 +1,222 @@
+# Example project overlay for the dimos repository.
+# Copy this file, adjust owner/name/branch/commands, and point AGENT_WORKER_CONFIG at it.
+#
+# Tip: run `agent-worker init` to generate one of these interactively instead
+# of hand-editing.
+
+project:
+  mode: existing
+  description: |
+    Long-running coding agent for the dimos robotics OS. Optimizes the existing
+    Python codebase: bug fixes, refactors, doc updates. Never scaffolds.
+
+repo:
+  owner: feipeng1234
+  name: dimos
+  base_branch: main
+  # Local checkout reused for sandbox mode `worktree`. Leave empty to use ARTIFACT_ROOT/repo.
+  local_path: /home/lenovo/dimos2
+
+# dimos uses hyphen-style labels (agent-todo, ...) not the default colon style (agent:todo).
+# Before running the Temporal flow on dimos, create the missing labels with:
+#
+#   for L in planning coding testing pr-created ci-running review blocked queued; do
+#     gh label create "agent-$L" --repo feipeng1234/dimos --color ededed 2>/dev/null || true
+#   done
+github:
+  issue_label_todo: agent-todo
+  issue_label_queued: agent-queued
+  issue_label_running: agent-running
+  issue_label_planning: agent-planning
+  issue_label_coding: agent-coding
+  issue_label_testing: agent-testing
+  issue_label_pr_created: agent-pr-created
+  issue_label_ci_running: agent-ci-running
+  issue_label_review: agent-review
+  issue_label_blocked: agent-blocked
+  issue_label_failed: agent-failed
+  issue_label_done: agent-done
+  # dimos has an "Auto Merge" workflow that polls for a 👍 from the Codex bot
+  # for up to 30 min. It's a human-gated step, not a real CI gate, so don't
+  # let it dictate the agent's "CI passed / failed" judgment.
+  ci_ignore_workflows:
+    - "Auto Merge"
+
+commands:
+  setup:
+    # Two-tier setup with diff-pollution protection:
+    # 1. **Symlink fast-path**: if the source repo's venv is fully synced
+    #    (ruff + pytest present), symlink it into the worktree. Saves 5-20
+    #    min of dependency download per worktree AND sidesteps the PyPI
+    #    stall problem (uv hanging on idle TCP for 30+ min).
+    # 2. **uv-sync fall-through**: otherwise, run a bounded ``uv sync`` with
+    #    aggressive timeouts so a stuck connection can't park forever.
+    #
+    # CRITICAL: after creating any worktree-local file (the .venv symlink,
+    # the setup marker, etc.) we write its name to ``.git/info/exclude``
+    # for THIS worktree. dimos's project ``.gitignore`` has ``.venv*/``
+    # (trailing slash = directories only) so a symlink-to-directory slips
+    # through and ends up in the agent's PR. Worktree-local exclude is
+    # per-worktree and never committed.
+    #
+    # To bootstrap the fast-path once:
+    #   cd /home/lenovo/dimos2 && uv sync --extra all
+    # (one-time, populates dimos2/.venv). After that every worktree starts
+    # in seconds.
+    - >
+      bash -c '
+        set -e
+        SRC=/home/lenovo/dimos2/.venv
+        # Add .venv to worktree-local exclude BEFORE creating the symlink so
+        # git never sees an untracked .venv at any point.
+        GITDIR=$(git rev-parse --git-dir 2>/dev/null) || true
+        if [ -n "$GITDIR" ]; then
+          mkdir -p "$GITDIR/info"
+          grep -qxF ".venv" "$GITDIR/info/exclude" 2>/dev/null \
+            || echo ".venv" >> "$GITDIR/info/exclude"
+        fi
+        if [ -x "$SRC/bin/ruff" ] && [ -x "$SRC/bin/pytest" ]; then
+          rm -rf .venv
+          ln -s "$SRC" .venv
+          echo "setup: symlinked .venv -> $SRC (fast-path, locally excluded)"
+        else
+          echo "setup: $SRC missing ruff/pytest; running uv sync (slow-path)"
+          timeout 900 env UV_HTTP_TIMEOUT=60 UV_CONCURRENT_DOWNLOADS=8 \
+            uv sync --extra all
+        fi
+      '
+  # Targeted lint/test using the tester's substitution tokens:
+  # - {changed_py_files} = only the *.py paths from the round's diff. Use this
+  #   for Python-only tools (ruff, mypy) so passing a .md / .yaml in doesn't
+  #   blow up the tool.
+  # - {changed_files}    = all changed paths. Use for generic shell tools.
+  # - {test_targets}     = test files derived from the source files (sibling
+  #   ``test_*.py`` lookup); use this for pytest.
+  # Empty token sets cause the command to **skip cleanly** rather than fall
+  # back to the full suite, which would defeat the whole point on this repo
+  # (~20 min full pytest run).
+  #
+  # Lint = pre-commit only. dimos's `.pre-commit-config.yaml` already runs
+  # `ruff-format` + `ruff-check --fix --unsafe-fixes` + `doclinks`
+  # (relative-md-link rewriter) + `trailing-whitespace` + `end-of-file-fixer`
+  # + `pretty-format-json` + license-header insertion + …  All of these are
+  # **auto-fix-and-exit-1** hooks. Without running them locally, the first
+  # place the agent sees a rewrite is GitHub's `lint` job (which runs
+  # `pre-commit/action`), and the PR ships red — exactly how PR #66 / issue
+  # #65 ended up `agent-failed`.
+  #
+  # We run pre-commit **twice in one shell**:
+  #   1. First invocation applies fixes (exit 1).
+  #   2. Second invocation verifies the tree is now clean (exit 0).
+  # If the second run still exits non-zero it's a real lint failure (a hook
+  # the human must address), and the tester rightly reports FAIL.
+  #
+  # The deliverer commits via `git add -A`, so any auto-fix the first run
+  # wrote into the worktree gets included in the agent's commit. End result:
+  # GitHub's `lint` job sees a tree pre-commit is already happy with.
+  #
+  # If you point this overlay at a project without `.pre-commit-config.yaml`,
+  # remove this line; pre-commit will exit non-zero saying so and the
+  # tester will FAIL the round.
+  #
+  # IMPORTANT: use `uv run pre-commit` rather than bare `pre-commit`. dimos's
+  # config uses the modern `stages: [pre-commit]` spelling that needs
+  # pre-commit >= 3.2. A system-wide /usr/bin/pre-commit (often 2.17 on
+  # Ubuntu 22.04) crashes with `InvalidConfigError: ... but got: 'pre-commit'`.
+  # `uv run` resolves to the venv-pinned pre-commit (4.x in dimos) regardless
+  # of what's on PATH.
+  lint:
+    - "uv run pre-commit run --files {changed_files} || uv run pre-commit run --files {changed_files}"
+  # Test = a *fixed*, small, fast smoke set. Two layers:
+  #
+  #   1. `import dimos` — just import the top-level package. Catches
+  #      ~80% of "agent broke the package" regressions (syntax errors,
+  #      missing imports, circular imports introduced by a refactor)
+  #      in ~60 ms. Independent of {test_targets}, so always runs.
+  #
+  #   2. `pytest -x dimos/types/` — actually executes the tiny
+  #      `dimos/types/` test suite (49 tests, ~2 s wall-clock). This
+  #      directory is pure-Python type primitives with no ROS / no
+  #      hardware / no network deps, so it's reliably fast and a real
+  #      smoke against agent-induced damage to the type system.
+  #
+  # Why NOT use `{test_targets}` substitution here?
+  #   - On dimos, `{test_targets}` expands to dozens-to-hundreds of
+  #     test files for any moderately-wide diff (observed live).
+  #   - `pytest --collect-only` does NOT make this fast on dimos:
+  #     each test module's import has heavy side effects, so even
+  #     collection of 60 files takes 5+ min.
+  #   - Real test execution belongs in GitHub CI (which IS the merge
+  #     gate). Burning 15-20 min of the agent's wall-clock locally
+  #     just to redo what `gh actions` will do on push is a bad
+  #     trade-off.
+  #
+  # If you DO want PR-relevant tests locally (e.g. so the reviewer has
+  # diff-correlated test evidence), add a third line gated on a small
+  # cap, e.g.:
+  #   - "uv run pytest -x --timeout=60 {test_targets}"
+  # but be aware of the cost above. Empty cmd ({test_targets} has zero
+  # entries) skips cleanly.
+  test:
+    - "uv run python -c 'import dimos'"
+    - "uv run pytest -x --timeout=60 dimos/types/"
+  build: []
+
+executor:
+  default: cursor
+  shell:
+    enabled: true
+    command: bash
+    args_template:
+      - "-lc"
+      - "{prompt}"
+    # dimos's full pytest suite + ruff + uv sync can take 15-20 min on a cold
+    # cache. The shipped 600s default trips for any reasonably big project.
+    # 1800s = 30 min matches the cursor-agent timeout so neither layer chops
+    # the other off.
+    timeout_seconds: 1800
+
+sandbox:
+  # Phase 2 requires an isolated checkout; worktree mode points the coder at
+  # `<worktree_root>/<owner>--<repo>--issue-<n>/` cloned off repo.local_path.
+  mode: worktree
+  worktree_root: ./worktrees
+
+workflow:
+  max_retries: 3
+  # Cap the agent at 3 rounds before bailing — keeps a flaky CI loop from
+  # eating the whole hour.
+  max_agent_rounds: 3
+  # Phase 3: "done" runs planner → coder → tester → reviewer → deliverer → reporter.
+  # The deliverer opens a real Pull Request. Use "testing" for a dry-run
+  # without push/PR creation, or "review" to also gate on self-review without
+  # opening a PR.
+  stop_after: done
+  require_human_review: true
+  # dimos CI's real test/lint workflows (ci, macos, pre-commit, doc-codeblocks)
+  # often sit in QUEUED for several minutes before they start. Giving the
+  # workflow 30 min is the safe default; the dispatcher loop will still pick
+  # the issue back up to recover if it does hit timeout.
+  # IMPORTANT: these have to live in YAML (not env) because `agent-worker
+  # run-issue` constructs IssueAgentInput from config at dispatch time, not
+  # at worker startup; env-only overrides on the worker won't reach the
+  # workflow input.
+  ci_poll_interval_seconds: 30
+  ci_max_wait_seconds: 1800
+  # Turn on the auto-dispatcher: the worker process will continuously list
+  # agent-todo issues and start workflows for them, and recover agent-blocked
+  # issues whose PR has since reached a real CI verdict.
+  dispatcher:
+    enabled: true
+    poll_interval_seconds: 30
+    max_dispatch_per_cycle: 10
+    auto_recover_blocked: true
+    blocked_recover_min_interval_seconds: 600
+    revive_orphans: true
+    orphan_check_interval_seconds: 300
+    orphan_revive_min_interval_seconds: 900
+
+policies:
+  require_human_review_labels:
+    - "needs-review"
+    - "security"

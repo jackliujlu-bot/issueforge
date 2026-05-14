@@ -1,0 +1,221 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# IssueForge — generic Python project template
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Copy this file to `configs/<your-project>.yaml` and fill in the marked
+# placeholders. Anything not marked has a sensible default; you can leave it.
+#
+#     cp configs/examples/generic-python.yaml configs/myproject.yaml
+#     $EDITOR configs/myproject.yaml
+#     echo "AGENT_WORKER_CONFIG=configs/myproject.yaml" >> .env
+#
+# Then run `issueforge doctor --fix` to verify and apply auto-fixes (creates
+# the GitHub labels, mkdir's the local dirs, etc.). See docs/PORTING.md for
+# the full porting guide if you have a non-Python project.
+#
+# Loading order (last wins):
+#   configs/default.yaml ← THIS FILE ← env vars (AGENT_WORKER__…) ← CLI flags
+# ─────────────────────────────────────────────────────────────────────────────
+
+project:
+  # `existing` (most common): point at an already-cloned repo, optimize/fix.
+  # `scaffold`: start a brand-new project from scratch (rare).
+  mode: existing
+
+  # One-line human description of what this worker should do for this repo.
+  # IssueForge prepends it to the planner's prompt so the agent stays in the
+  # right frame. Keep it short and concrete.
+  description: |
+    Long-running coding agent for <project name>. Typical work: bug fixes,
+    refactors, doc updates, small features driven by GitHub issues.
+
+repo:
+  # ── REQUIRED ──────────────────────────────────────────────────────────────
+  owner: ""              # e.g. "acme" or "alice"
+  name: ""               # e.g. "widget"
+  base_branch: main      # the default branch the agent's PRs target
+
+  # Absolute path to a local checkout of the repo. The agent uses
+  # `git worktree add` here for isolation, never modifying the main checkout.
+  # If empty, IssueForge clones into `${ARTIFACT_ROOT}/repo` automatically.
+  local_path: ""         # e.g. "/home/alice/code/widget"
+  # ──────────────────────────────────────────────────────────────────────────
+
+  # If you need a non-default clone URL (e.g. SSH instead of derived HTTPS),
+  # set it here. Empty = derive `git@github.com:{owner}/{name}.git`.
+  clone_url: ""
+
+  # IssueForge fetches `<remote>/<base_branch>` before each new agent branch
+  # so a stale local checkout can't leak unpushed commits into the agent's
+  # PR. Leave true unless you specifically want the opposite.
+  auto_fetch_base: true
+
+github:
+  # ── Label names ──────────────────────────────────────────────────────────
+  # IssueForge ships two style presets. The default config uses colon-style
+  # (`agent:todo`); some teams / GitHub apps don't like colons in labels and
+  # prefer hyphens (`agent-todo`). Pick one — `issueforge doctor --fix`
+  # creates whichever you choose on the remote.
+  #
+  # If you'd rather use a different prefix entirely (e.g. `ai:` instead of
+  # `agent:`), just rename them — the worker has zero hardcoded label names,
+  # it reads each one from this section.
+  issue_label_todo:       agent-todo
+  issue_label_queued:     agent-queued
+  issue_label_running:    agent-running
+  issue_label_planning:   agent-planning
+  issue_label_coding:     agent-coding
+  issue_label_testing:    agent-testing
+  issue_label_pr_created: agent-pr-created
+  issue_label_ci_running: agent-ci-running
+  issue_label_review:     agent-review
+  issue_label_blocked:    agent-blocked
+  issue_label_failed:     agent-failed
+  issue_label_done:       agent-done
+
+  # If your repo runs CI workflows that aren't real "code-quality gates"
+  # (e.g. an "Auto Merge" workflow that polls for a 👍 reaction, or a docs
+  # preview deploy), list them here so the worker doesn't wait on / fail on
+  # them. Case-insensitive substring match.
+  ci_ignore_workflows: []
+  # Example:
+  # ci_ignore_workflows:
+  #   - "Auto Merge"
+  #   - "Docs Preview"
+
+commands:
+  # IssueForge runs these inside the worktree on every agent round.
+  #
+  # Substitution tokens you can use in any command line below:
+  #   {changed_py_files}  the *.py paths the round actually changed
+  #   {changed_files}     all changed paths (any extension)
+  #   {test_targets}      test files derived from the changed sources
+  #                       (sibling test_*.py lookup)
+  #
+  # When a token expands to an empty list, the corresponding command is
+  # **skipped entirely** rather than running on the whole repo. That's
+  # usually what you want.
+  setup:
+    # Pick ONE of:
+    #
+    # (a) `uv` (fastest, recommended) — installs deps from pyproject.toml /
+    #     uv.lock into the worktree's `.venv`. Works for any uv-based project.
+    - "uv sync --frozen"
+    #
+    # (b) plain pip + venv:
+    # - "python -m venv .venv && .venv/bin/pip install -e ."
+    #
+    # (c) poetry:
+    # - "poetry install --no-interaction --no-root"
+
+  lint:
+    # Pick ONE of:
+    #
+    # (a) `pre-commit` — covers the most ground if you already use it
+    #     (ruff-format / ruff-check / trailing-whitespace / etc.). Many hooks
+    #     auto-fix and exit 1, so we run twice in one shell: first run applies
+    #     fixes, second run verifies the tree is now clean.
+    - "uv run pre-commit run --files {changed_files} || uv run pre-commit run --files {changed_files}"
+    #
+    # (b) explicit ruff (good if pre-commit isn't set up):
+    # - "uv run ruff check {changed_py_files}"
+    # - "uv run ruff format --check {changed_py_files}"
+    #
+    # (c) flake8 + black:
+    # - "flake8 {changed_py_files}"
+    # - "black --check {changed_py_files}"
+
+  test:
+    # The honest answer for most projects: have a small fast smoke set
+    # locally, and let GitHub Actions run the full suite. This keeps each
+    # agent round under ~10 seconds; the agent has a wall-clock budget.
+    #
+    # (a) Smoke import + targeted pytest on changed files (recommended):
+    - "uv run python -c 'import {your_top_level_package}'"
+    - "uv run pytest -x --timeout=60 {test_targets}"
+    #
+    # (b) Whole suite with timeout (only sensible for small projects):
+    # - "uv run pytest -x --timeout=60"
+    #
+    # (c) Empty (skip local tests entirely; rely on GitHub CI as merge gate):
+    # - []
+
+  build: []     # Most Python projects don't need a build step.
+
+executor:
+  # Which agent runs the actual code edits. `cursor-agent` is the default
+  # because it's the most stable headless coding agent today; switch by
+  # changing this one line + filling in the matching block below.
+  default: cursor
+
+  cursor:
+    enabled: true
+    command: cursor-agent
+    args_template:
+      - "--print"
+      - "--trust"
+      - "{prompt}"
+    timeout_seconds: 1800
+
+  claude_code:
+    enabled: false
+    command: claude
+    args_template:
+      - "-p"
+      - "{prompt}"
+    timeout_seconds: 1800
+
+  codex:
+    enabled: false
+    command: codex
+    args_template:
+      - "exec"
+      - "{prompt}"
+    timeout_seconds: 1800
+
+sandbox:
+  # `worktree` runs each agent round in a `git worktree add`-isolated copy
+  # of `repo.local_path`. The default and recommended mode.
+  mode: worktree
+  worktree_root: ./worktrees
+
+workflow:
+  # How many times the agent retries within a single round before giving up.
+  max_retries: 3
+  # Hard cap on plan→code→test→review cycles per issue. Keeps a flapping CI
+  # from burning the whole hour.
+  max_agent_rounds: 3
+
+  # `done` runs the full pipeline including push + open PR + watch CI.
+  # `review` stops after self-review (no PR push) — useful for dry runs.
+  # `testing` stops after local tests — useful for prompt-engineering.
+  stop_after: done
+
+  require_human_review: true
+
+  # CI watcher poll cadence + budget per cycle. The dispatcher will
+  # re-pick-up the issue on subsequent cycles if it does hit the cap.
+  ci_poll_interval_seconds: 30
+  ci_max_wait_seconds: 1800
+
+  # Auto-dispatcher: if true, the worker continuously scans GitHub for
+  # `agent:todo` issues and starts workflows for them. Recommended.
+  dispatcher:
+    enabled: true
+    poll_interval_seconds: 30
+    max_dispatch_per_cycle: 10
+    auto_recover_blocked: true
+    blocked_recover_min_interval_seconds: 600
+    # Re-dispatch issues whose workflow is missing/closed but the issue is
+    # still labeled "in progress". Recovers from worker crashes mid-round.
+    revive_orphans: true
+    orphan_check_interval_seconds: 300
+    orphan_revive_min_interval_seconds: 900
+
+policies:
+  # If the issue carries any of these labels, force a human review at the
+  # end (doesn't auto-merge even if everything else is green).
+  require_human_review_labels:
+    - "needs-review"
+    - "security"
+    - "production"

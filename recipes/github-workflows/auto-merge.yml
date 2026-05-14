@@ -1,0 +1,117 @@
+# IssueForge-recommended auto-merge workflow for the *business repo* the
+# worker operates on. Copy this file to `.github/workflows/auto-merge.yml`
+# in your repo (next to the `ci.yml` recipe).
+#
+# What it does:
+#   After the `ci` workflow finishes successfully, squash-merge the PR
+#   that triggered it — provided the PR is open, not draft, and either:
+#     (a) its head branch is `agent/*` (i.e. an IssueForge-generated PR), or
+#     (b) a maintainer has applied the `auto-merge` label.
+#
+# Why both conditions:
+#   - `agent/*` is a same-repo guarantee: the worker has push access here,
+#     so external contributors can't write to those branches. Auto-merging
+#     them is safe by construction.
+#   - The `auto-merge` label is the explicit opt-in for human-driven PRs.
+#     A reviewer adds the label after they're satisfied with the diff;
+#     once CI goes green the bot does the merge button-click for them.
+#
+# Security:
+#   `workflow_run` jobs always execute the version of the workflow file
+#   that's on the **default branch**, so a malicious PR cannot change its
+#   own merge gate by editing this file in their PR. Only the version on
+#   `main` is trusted.
+
+name: auto-merge
+
+on:
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
+
+permissions:
+  contents: write       # for the merge commit
+  pull-requests: write  # for `gh pr merge`
+
+jobs:
+  merge:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find the open PR for this CI run
+        id: find_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -e
+          # `workflow_run` payload lacks the PR number; resolve via the
+          # head_sha → open PRs index. Pick the first open one.
+          pr_json=$(gh api \
+            "repos/${{ github.repository }}/commits/${HEAD_SHA}/pulls" \
+            --jq '[.[] | select(.state=="open")] | first // empty')
+          if [ -z "$pr_json" ] || [ "$pr_json" = "null" ]; then
+            echo "No open PR for sha ${HEAD_SHA}; nothing to do."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          number=$(echo "$pr_json" | jq -r '.number')
+          draft=$(echo  "$pr_json" | jq -r '.draft')
+          head=$(echo   "$pr_json" | jq -r '.head.ref')
+          labels=$(echo "$pr_json" | jq -r '[.labels[].name] | join(",")')
+          echo "Resolved PR #${number} (head=${head}, draft=${draft}, labels=${labels})"
+          echo "found=true"        >> "$GITHUB_OUTPUT"
+          echo "number=${number}"  >> "$GITHUB_OUTPUT"
+          echo "draft=${draft}"    >> "$GITHUB_OUTPUT"
+          echo "head=${head}"      >> "$GITHUB_OUTPUT"
+          echo "labels=${labels}"  >> "$GITHUB_OUTPUT"
+
+      - name: Decide whether the PR is eligible
+        id: decide
+        if: steps.find_pr.outputs.found == 'true'
+        env:
+          DRAFT: ${{ steps.find_pr.outputs.draft }}
+          HEAD: ${{ steps.find_pr.outputs.head }}
+          LABELS: ${{ steps.find_pr.outputs.labels }}
+        shell: bash
+        run: |
+          set -e
+          if [ "${DRAFT}" = "true" ]; then
+            echo "PR is draft; skipping."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if echo "${LABELS}" | tr ',' '\n' | grep -qx 'auto-merge'; then
+            echo "PR is labeled 'auto-merge'."
+            echo "go=true"            >> "$GITHUB_OUTPUT"
+            echo "reason=label"       >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          case "${HEAD}" in
+            agent/*)
+              echo "PR head '${HEAD}' is an agent branch."
+              echo "go=true"               >> "$GITHUB_OUTPUT"
+              echo "reason=agent_branch"   >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
+          echo "PR is neither labeled 'auto-merge' nor from agent/*; skipping."
+          echo "go=false" >> "$GITHUB_OUTPUT"
+
+      - name: Squash-merge the PR
+        if: steps.decide.outputs.go == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ steps.find_pr.outputs.number }}
+          REASON: ${{ steps.decide.outputs.reason }}
+        shell: bash
+        run: |
+          set -e
+          echo "Auto-merging PR #${PR} (reason: ${REASON})"
+          gh pr merge "${PR}" \
+            --repo "${{ github.repository }}" \
+            --squash \
+            --delete-branch

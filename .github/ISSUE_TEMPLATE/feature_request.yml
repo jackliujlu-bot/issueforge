@@ -1,0 +1,32 @@
+name: Feature request
+description: Suggest an improvement or new capability.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: motivation
+    attributes:
+      label: What's the problem this solves?
+      description: |
+        Concrete situation, not just the proposed solution. The "why" is more
+        useful to us than the "what" — multiple solutions to the same problem
+        are easy to evaluate, but solutions to imagined problems aren't.
+    validations:
+      required: true
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed solution
+      description: How would you like it to work? Include CLI / config / API sketches if applicable.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+  - type: textarea
+    id: portability
+    attributes:
+      label: Does this stay portable?
+      description: |
+        IssueForge has a hard rule: nothing project-specific in the worker
+        code. If your idea risks coupling the worker to one repo's
+        peculiarities, propose where the project-specific knob would live in
+        YAML instead.

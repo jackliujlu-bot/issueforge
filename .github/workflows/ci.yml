@@ -1,0 +1,90 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - '**.md'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  lint:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install with dev extras
+        run: uv pip install --system -e ".[dev]"
+      - name: Ruff (lint)
+        run: ruff check app tests
+      - name: Ruff (format check)
+        run: ruff format --check app tests
+
+  type-check:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install with dev extras
+        run: uv pip install --system -e ".[dev]"
+      - name: Mypy
+        run: mypy app
+        # NOTE: the worker has pre-existing mypy debt (~40 untyped-dict
+        # warnings spread across 12 files). Once that's cleaned up, drop
+        # this `continue-on-error` so type errors block PRs.
+        continue-on-error: true
+
+  tests:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install with dev extras
+        run: uv pip install --system -e ".[dev]"
+      - name: Pytest
+        run: pytest -q
+
+  ci-complete:
+    if: always()
+    needs:
+      - lint
+      - type-check
+      - tests
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Aggregate
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}
+          allowed-failures: type-check  # remove once mypy debt is cleared

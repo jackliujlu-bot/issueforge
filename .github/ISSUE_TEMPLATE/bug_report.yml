@@ -1,0 +1,55 @@
+name: Bug report
+description: Something is going wrong with IssueForge itself.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing! Please make sure the issue you're reporting is
+        about IssueForge (the worker), not about the agent's behavior on a
+        specific *business repo* — those are usually configuration issues
+        and belong in your business repo's issues, not here.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear, specific description. Include the command that triggered it.
+      placeholder: |
+        I ran `issueforge bootstrap` and it failed at the PREFLIGHT phase
+        with "...". I expected ...
+    validations:
+      required: true
+  - type: textarea
+    id: how-to-reproduce
+    attributes:
+      label: How to reproduce
+      description: Minimal steps. Include your config (`issueforge show-config`, with secrets redacted).
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: |
+        - For worker / dispatcher issues: tail of `logs/agent-worker.log`.
+        - For per-issue failures: the contents of
+          `runs/<owner>--<repo>--issue-<n>/handoff.md`.
+        - For Temporal-related issues: the workflow ID and a screenshot or
+          export from the Temporal UI's History tab.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: IssueForge version / commit
+      description: |
+        `issueforge --version` or the git SHA you're on.
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: OS / Python / executor
+      description: |
+        e.g. "Ubuntu 22.04, Python 3.12, cursor-agent 0.x.y"
+    validations:
+      required: true

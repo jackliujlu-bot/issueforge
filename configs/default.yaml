@@ -1,0 +1,205 @@
+# issue-agent-worker default configuration
+#
+# Loading order (last wins):
+#   1. this file (default.yaml)
+#   2. project YAML pointed to by AGENT_WORKER_CONFIG env var or --config CLI flag
+#   3. environment variables (prefixed AGENT_WORKER__ for nested, plus a few well-known names)
+#   4. CLI flags
+#
+# Nothing in this file is repo-specific; everything that varies between projects must be
+# overridden in the project YAML.
+
+system:
+  name: issue-agent-worker
+  artifact_root: ./runs
+  log_level: INFO
+  log_format: console # console | json
+
+# What this worker is doing for this project.
+# Set with `agent-worker init`, or hand-edit before running anything else.
+project:
+  # `existing` (default): optimize an already-existing repository. The agent reads
+  #   code, makes incremental changes, opens PRs against repo.base_branch.
+  #   repo.local_path should point at a checkout (`agent-worker doctor --fix`
+  #   can clone it for you).
+  # `scaffold`: start a fresh project from zero. doctor --fix initializes
+  #   repo.local_path as an empty git repo if missing.
+  mode: existing
+
+  # One-line human description of what this worker is supposed to do.
+  # Surfaced in show-config and prepended to planner prompts.
+  description: ""
+
+# Repository under management.
+# REQUIRED in project YAML; left blank in default so misconfiguration fails loudly.
+repo:
+  provider: github
+  owner: ""
+  name: ""
+  # If omitted we derive: git@github.com:{owner}/{name}.git
+  clone_url: ""
+  base_branch: main
+  working_branch_prefix: agent
+  push_remote: origin
+  # Local checkout used when worktree mode is local. Empty -> ARTIFACT_ROOT/repo
+  local_path: ""
+  # If true (default), the worktree backend runs `git fetch <push_remote>
+  # <base_branch>` before creating a new agent branch, and branches from
+  # `<remote>/<base_branch>` instead of the local branch. This prevents the
+  # "stale local main" failure where unpushed local commits leak into the
+  # agent's PR. Set to false if you want the agent to inherit your local
+  # uncommitted-to-remote work.
+  auto_fetch_base: true
+
+github:
+  # gh CLI binary; "gh" assumes it is on PATH.
+  cli: gh
+  issue_label_todo: agent:todo
+  issue_label_queued: agent:queued
+  issue_label_running: agent:running
+  issue_label_planning: agent:planning
+  issue_label_coding: agent:coding
+  issue_label_testing: agent:testing
+  issue_label_pr_created: agent:pr-created
+  issue_label_ci_running: agent:ci-running
+  issue_label_review: agent:review
+  issue_label_blocked: agent:blocked
+  issue_label_failed: agent:failed
+  issue_label_done: agent:done
+  pr_draft: false
+  auto_merge: false
+  delete_branch_after_merge: true
+  # Workflow names (case-insensitive substring) to exclude from CI polling.
+  # Useful for human-gated workflows like an "Auto Merge" job that polls for
+  # a reviewer reaction — these would otherwise keep the agent waiting or
+  # mark a PR as failed when a human just hasn't approved yet.
+  ci_ignore_workflows: []
+
+# Commands invoked by the tester / setup nodes. Empty arrays disable the step.
+commands:
+  setup: []
+  lint: []
+  test: []
+  build: []
+
+# Code executors. The default executor is selected by `executor.default`.
+# Each executor entry mirrors its concrete class config.
+executor:
+  default: cursor
+
+  cursor:
+    enabled: true
+    # Binary to invoke. Override via CURSOR_AGENT_BIN env var.
+    command: cursor-agent
+    # Headless / non-interactive flag set used to run a one-shot prompt.
+    # --trust is required to skip the workspace-trust prompt in headless mode.
+    # Substitution: {prompt} {workspace} {model}
+    args_template:
+      - "--print"
+      - "--trust"
+      - "{prompt}"
+    model: ""
+    timeout_seconds: 1800
+
+  claude_code:
+    enabled: false
+    command: claude
+    args_template:
+      - "-p"
+      - "{prompt}"
+    timeout_seconds: 1800
+
+  codex:
+    enabled: false
+    command: codex
+    args_template:
+      - "exec"
+      - "{prompt}"
+    timeout_seconds: 1800
+
+  openhands:
+    enabled: false
+    command: openhands
+    args_template: []
+    timeout_seconds: 1800
+
+  shell:
+    enabled: true
+    command: bash
+    args_template:
+      - "-lc"
+      - "{prompt}"
+    timeout_seconds: 600
+
+  # Stub executor: never shells out, just writes a deterministic plan.
+  # Useful for CI / smoke tests / when no external agent is configured.
+  stub:
+    enabled: true
+
+sandbox:
+  # Mode: local | worktree | docker. Phase 1 uses `local` (no checkout, just artifact dir).
+  mode: local
+  worktree_root: ./worktrees
+  docker_image: ""
+  docker_extra_args: []
+
+workflow:
+  temporal:
+    host: localhost:7233
+    namespace: default
+    task_queue: issue-agent-worker
+  max_retries: 5
+  max_agent_rounds: 10
+  local_test_required: false
+  ci_required: false
+  require_human_review: true
+  # Phase 1 stops the workflow after planning so we don't shell out to the executor by default.
+  stop_after: planning # planning | coding | testing | review | done
+  # Phase 4: how often to poll GitHub CI, and the total budget per CI cycle.
+  ci_poll_interval_seconds: 30
+  ci_max_wait_seconds: 7200
+  # Auto-dispatcher (poll GitHub for new agent:todo issues, and recover from
+  # agent:blocked). Disabled by default — set ``workflow.dispatcher.enabled:
+  # true`` in your project YAML (or pass ``--with-dispatcher`` to
+  # ``agent-worker worker``) to turn it on. See app/dispatcher/loop.py for
+  # the loop's exact behaviour.
+  dispatcher:
+    enabled: false
+    poll_interval_seconds: 30
+    max_dispatch_per_cycle: 10
+    auto_recover_blocked: true
+    blocked_recover_min_interval_seconds: 600
+    # Orphan revival: if an issue is labelled agent-running / agent-planning /
+    # agent-coding / agent-testing / agent-pr-created / agent-ci-running but
+    # its Temporal workflow is absent or closed, re-dispatch it. Handles the
+    # "worker crashed mid-round" case so issues don't hang in planning forever.
+    revive_orphans: true
+    orphan_check_interval_seconds: 300
+    orphan_revive_min_interval_seconds: 900
+
+langgraph:
+  checkpoint_backend: sqlite # sqlite | memory
+  checkpoint_db: ./checkpoints/langgraph.sqlite
+
+feishu:
+  enabled: false
+  default_repo: ""
+  webhook_path: /feishu/webhook
+  port: 8080
+  # Shared secret for HMAC verification; required for production.
+  verify_token: ""
+  default_labels:
+    - agent-todo
+  # If true, create-issue immediately dispatches a Temporal workflow.
+  auto_start_workflow: true
+
+# Per-issue overrides can live under `policies` (e.g. label-based routing).
+policies:
+  # If the issue has any of these labels, force human review at the end.
+  require_human_review_labels:
+    - "needs-review"
+    - "security"
+    - "production"
+  # If the issue title or body matches any of these regexes, refuse to act
+  # (must be reviewed by a human first).
+  refuse_patterns: []

@@ -1,0 +1,32 @@
+name: Porting help
+description: I'm trying to use IssueForge on my repo and I'm stuck.
+labels: ["question", "porting"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, please skim **[docs/PORTING.md](../blob/main/docs/PORTING.md)**.
+        It has a "When something goes wrong" cheat sheet that covers the most
+        common porting pitfalls (gh auth, missing labels, lint chain, full
+        suite running locally, …).
+  - type: input
+    id: my-repo
+    attributes:
+      label: Your business repo
+      description: e.g. "github.com/myorg/widget"
+    validations:
+      required: true
+  - type: textarea
+    id: my-config
+    attributes:
+      label: Your project YAML
+      description: Paste `issueforge show-config` output (redact tokens).
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    id: what-i-tried
+    attributes:
+      label: What you've tried and what's failing
+    validations:
+      required: true

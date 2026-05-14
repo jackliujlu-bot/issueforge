@@ -1,0 +1,118 @@
+# Local Temporal stack + IssueForge worker.
+#
+# Bring up with:    docker compose up -d
+# Inspect UI at:    http://localhost:8233
+# Tear down with:   docker compose down -v
+#
+# ─────────────────────────────────────────────────────────────────────
+# Required env vars (put them in `.env` next to this file)
+# ─────────────────────────────────────────────────────────────────────
+#
+#   AGENT_WORKER_CONFIG       Path inside ./configs to the project YAML
+#                             (e.g. configs/my-project.yaml). The worker
+#                             reads this on boot to know which repo to
+#                             watch.
+#
+#   WORKER_BUSINESS_REPO_PATH Absolute host path to the *business repo*
+#                             checkout the worker should operate on
+#                             (must match `repo.local_path` in your
+#                             project YAML). Required when using the
+#                             default `sandbox.mode: worktree`. Leave
+#                             unset only if the worker doesn't need any
+#                             local checkout (e.g. you've configured a
+#                             pure-API mode).
+#
+#   GITHUB_TOKEN              (optional) override the gh CLI auth. If
+#                             unset, the container reuses the host's
+#                             `gh auth login` credentials mounted from
+#                             ${HOME}/.config/gh.
+#
+# ─────────────────────────────────────────────────────────────────────
+# Three services
+# ─────────────────────────────────────────────────────────────────────
+#
+#   temporal     : the durable runtime (auto-setup sqlite).
+#   temporal-ui  : web UI for workflows.
+#   worker       : the long-running IssueForge process. Auto-restarts on
+#                  crash; tail logs with `docker compose logs -f worker`.
+#                  Embeds the dispatcher loop, so issues labelled
+#                  `agent:todo` get picked up automatically.
+#
+# If you just want temporal + UI (e.g. you're running the worker on the
+# host so it can use a locally-installed `cursor-agent`):
+#
+#   docker compose up -d temporal temporal-ui
+
+services:
+  temporal:
+    image: temporalio/auto-setup:1.24.2
+    container_name: issueforge-temporal
+    ports:
+      - "7233:7233"
+    environment:
+      - DB=sqlite
+      - SQLITE_PRAGMA=journal_mode=WAL
+      - LOG_LEVEL=warn
+    healthcheck:
+      test: ["CMD", "tctl", "--address", "temporal:7233", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  temporal-ui:
+    image: temporalio/ui:2.27.2
+    container_name: issueforge-temporal-ui
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:8233
+    ports:
+      - "8233:8080"
+    restart: unless-stopped
+
+  worker:
+    # Tiny Python 3.12 image with the package + gh CLI installed.
+    # The Dockerfile lives next to this compose file. If you'd rather run
+    # the worker on the host (e.g. to use a locally-installed
+    # cursor-agent), comment this service out or run only
+    # `docker compose up -d temporal temporal-ui`.
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: issueforge-worker
+    depends_on:
+      temporal:
+        condition: service_healthy
+    # Restart forever — this is the whole point of the worker. If it
+    # crashes, Temporal history is intact and the new process picks up
+    # where the old one left off (Temporal history + LangGraph
+    # checkpoint + on-disk artifacts).
+    restart: always
+    environment:
+      # The compose stack uses the service DNS name "temporal" instead
+      # of localhost.
+      - TEMPORAL_HOST=temporal:7233
+      - AGENT_WORKER_CONFIG=${AGENT_WORKER_CONFIG:?missing AGENT_WORKER_CONFIG (set it in .env to e.g. configs/my-project.yaml)}
+      # If GITHUB_TOKEN is unset, the container reuses the host's
+      # `gh auth login` from the mounted ~/.config/gh.
+      - GH_TOKEN=${GITHUB_TOKEN:-}
+    volumes:
+      # The worker's persistent state lives in these dirs on the host.
+      - ./runs:/workspace/runs
+      - ./checkpoints:/workspace/checkpoints
+      - ./worktrees:/workspace/worktrees
+      - ./logs:/workspace/logs
+      # Project configs are read-only from the worker's POV.
+      - ./configs:/workspace/configs:ro
+      # Mount the business-repo checkout the worker should operate on.
+      # MUST be set in .env (or this `up` fails). Mounted at the same
+      # path inside the container so `repo.local_path` in your YAML can
+      # be the host path verbatim.
+      - ${WORKER_BUSINESS_REPO_PATH:?missing WORKER_BUSINESS_REPO_PATH (set in .env to the absolute path of your business repo checkout)}:${WORKER_BUSINESS_REPO_PATH}
+      # Bring the host user's gh + ssh credentials in. The container
+      # runs as root by default so paths inside /root match.
+      - ${HOME}/.config/gh:/root/.config/gh:ro
+      - ${HOME}/.ssh:/root/.ssh:ro
+    command: ["issueforge", "worker", "--with-dispatcher"]
