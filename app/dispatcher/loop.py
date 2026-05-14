@@ -104,8 +104,7 @@ class _IssuesAPI(Protocol):
 
 
 class _PRAPI(Protocol):
-    def find_for_branch(self, head_branch: str):  # noqa: ANN201 - structural
-        ...
+    def find_for_branch(self, head_branch: str): ...
 
 
 class _CIAPI(Protocol):
@@ -190,7 +189,7 @@ async def run_one_iteration(
     config: AppConfig,
     dispatcher_config: DispatcherConfig,
     deps: DispatcherDeps,
-    state: "_RecoveryState | None" = None,
+    state: _RecoveryState | None = None,
 ) -> DispatcherIteration:
     """Execute one dispatcher cycle and return what happened.
 
@@ -290,10 +289,8 @@ async def run_dispatcher_loop(
             return
 
         try:
-            await asyncio.wait_for(
-                stop_event.wait(), timeout=cfg.poll_interval_seconds
-            )
-        except asyncio.TimeoutError:
+            await asyncio.wait_for(stop_event.wait(), timeout=cfg.poll_interval_seconds)
+        except TimeoutError:
             continue
         else:
             break
@@ -319,9 +316,7 @@ def build_default_deps(config: AppConfig) -> DispatcherDeps:
     ci = GitHubCIService(config.repo, config.github)
 
     async def _dispatch(issue_number: int) -> _DispatchedHandle:
-        handle, outcome = await start_issue_workflow(
-            config, issue_number=issue_number
-        )
+        handle, outcome = await start_issue_workflow(config, issue_number=issue_number)
         return _DispatchedHandle(workflow_id=handle.id, outcome=outcome)
 
     async def _workflow_status(workflow_id: str) -> WorkflowStatusLabel:
@@ -447,9 +442,7 @@ async def _handle_blocked(
 
         if decision is _BlockedDecision.NO_PR_YET:
             result.stats.blocked_skipped_pending += 1
-            result.notes.append(
-                f"#{issue.number}: no PR for agent branch yet — leaving as blocked"
-            )
+            result.notes.append(f"#{issue.number}: no PR for agent branch yet — leaving as blocked")
             continue
 
         if decision is _BlockedDecision.CI_PENDING:
@@ -542,9 +535,7 @@ async def _handle_orphans(
 
     in_flight_labels = _in_flight_labels(config)
     try:
-        issues = deps.issues.list_open_with_any_label(
-            in_flight_labels, limit_per_label=50
-        )
+        issues = deps.issues.list_open_with_any_label(in_flight_labels, limit_per_label=50)
     except Exception as exc:
         log.warning("dispatcher.orphan_list_failed", error=str(exc))
         result.stats.errors += 1

@@ -64,21 +64,21 @@ def test_wizard_full_existing_repo_flow(tmp_path: Path) -> None:
 
     io = ScriptedIO(
         [
-            "existing",                              # project_mode
+            "existing",  # project_mode
             "Long-running coding agent for acme/widget.",  # description
-            "acme/widget",                            # repo slug
-            "",                                        # custom clone url (default empty)
-            "main",                                    # base branch
-            str(cwd),                                  # local path
-            "uv sync",                                 # setup
-            "uv run ruff check",                       # lint
-            "uv run pytest",                           # test
-            "",                                        # build (empty)
-            "cursor",                                  # executor
-            "worktree",                                # sandbox mode
-            False,                                     # feishu_enabled
-            "configs/widget.yaml",                     # output path
-            True,                                      # update dotenv
+            "acme/widget",  # repo slug
+            "",  # custom clone url (default empty)
+            "main",  # base branch
+            str(cwd),  # local path
+            "uv sync",  # setup
+            "uv run ruff check",  # lint
+            "uv run pytest",  # test
+            "",  # build (empty)
+            "cursor",  # executor
+            "worktree",  # sandbox mode
+            False,  # feishu_enabled
+            "configs/widget.yaml",  # output path
+            True,  # update dotenv
         ]
     )
     answers = run_wizard(io, project_root=project_root, cwd=cwd)
@@ -202,9 +202,7 @@ def test_update_dotenv_creates_file_if_missing(tmp_path: Path) -> None:
 
 def test_update_dotenv_replaces_existing_line(tmp_path: Path) -> None:
     env_path = tmp_path / ".env"
-    env_path.write_text(
-        "AGENT_WORKER_CONFIG=old.yaml\nGITHUB_TOKEN=secret\n"
-    )
+    env_path.write_text("AGENT_WORKER_CONFIG=old.yaml\nGITHUB_TOKEN=secret\n")
     update_dotenv(env_path, config_path=Path("configs/new.yaml"))
     text = env_path.read_text()
     assert "AGENT_WORKER_CONFIG=configs/new.yaml" in text
@@ -322,9 +320,7 @@ def test_choose_strategy_use_existing_by_number(tmp_path: Path) -> None:
 
 
 def test_choose_strategy_w_runs_wizard_even_with_overlays(tmp_path: Path) -> None:
-    _write_yaml(
-        tmp_path / "configs" / "alpha.yaml", {"repo": {"owner": "a", "name": "b"}}
-    )
+    _write_yaml(tmp_path / "configs" / "alpha.yaml", {"repo": {"owner": "a", "name": "b"}})
     io = _ScriptedIO(["w"])
     choice = choose_config_strategy(io, project_root=tmp_path)
     assert choice.strategy == "wizard"
@@ -344,9 +340,7 @@ def test_choose_strategy_clone_path(tmp_path: Path) -> None:
 
 
 def test_choose_strategy_retries_on_garbage(tmp_path: Path) -> None:
-    _write_yaml(
-        tmp_path / "configs" / "alpha.yaml", {"repo": {"owner": "a", "name": "b"}}
-    )
+    _write_yaml(tmp_path / "configs" / "alpha.yaml", {"repo": {"owner": "a", "name": "b"}})
     io = _ScriptedIO(["banana", "9", "1"])
     choice = choose_config_strategy(io, project_root=tmp_path)
     assert choice.strategy == "use_existing"

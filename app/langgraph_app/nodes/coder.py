@@ -292,8 +292,7 @@ def coder_node(ctx: NodeContext) -> CoderCallable:
         if not result.ok:
             stderr = result.metadata.get("stderr", "")
             update["last_error"] = (
-                f"Coder executor failed (exit_code={result.exit_code}). "
-                f"stderr={str(stderr)[:500]}"
+                f"Coder executor failed (exit_code={result.exit_code}). stderr={str(stderr)[:500]}"
             )
         else:
             # Clear the inherited error so the tester sees a fresh slate.

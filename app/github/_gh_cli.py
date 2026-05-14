@@ -52,9 +52,7 @@ class GhClient:
                 check=False,
             )
         except FileNotFoundError as exc:
-            raise GhCommandError(
-                cmd=cmd, returncode=127, stdout="", stderr=str(exc)
-            ) from exc
+            raise GhCommandError(cmd=cmd, returncode=127, stdout="", stderr=str(exc)) from exc
 
     def run_checked(
         self,

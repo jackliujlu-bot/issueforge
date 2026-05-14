@@ -136,9 +136,7 @@ def build_app(feishu_or_config: Any) -> Any:
     return app
 
 
-def _verify_signature(
-    *, token: str, timestamp: str, nonce: str, body: bytes, given: str
-) -> bool:
+def _verify_signature(*, token: str, timestamp: str, nonce: str, body: bytes, given: str) -> bool:
     if not given:
         return False
     msg = (timestamp + nonce + token).encode("utf-8") + body

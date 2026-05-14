@@ -148,9 +148,7 @@ def tester_node(ctx: NodeContext) -> TesterCallable:
                 workspace=workspace,
                 substituted=resolved.substituted,
             )
-            ctx.artifacts.append_log(
-                ctx.run_dir.commands_log, f"{label}: {resolved.command}"
-            )
+            ctx.artifacts.append_log(ctx.run_dir.commands_log, f"{label}: {resolved.command}")
             result = ctx.shell.run(
                 ExecutorRequest(
                     kind="test",
@@ -183,9 +181,7 @@ def tester_node(ctx: NodeContext) -> TesterCallable:
                 },
             )
             if not result.ok:
-                stderr_snippet = (
-                    str(result.metadata.get("stderr", ""))[-_STDERR_SNIPPET:]
-                ).strip()
+                stderr_snippet = (str(result.metadata.get("stderr", ""))[-_STDERR_SNIPPET:]).strip()
                 failed.append((resolved.command, result.exit_code, stderr_snippet))
 
         if failed:
@@ -241,9 +237,7 @@ class _ResolvedCommand:
     skip_reason: str = ""
 
 
-def _build_substitutions(
-    *, changed_files: list[str], workspace: Path
-) -> _Substitutions:
+def _build_substitutions(*, changed_files: list[str], workspace: Path) -> _Substitutions:
     """Compute the three substitution sets for the current round.
 
     - ``changed_files``     — every non-directory entry the coder touched.
@@ -416,10 +410,7 @@ def _append_evidence(
     stdout: str,
     stderr: str,
 ) -> None:
-    header = (
-        f"\n===== {label}: {command} =====\n"
-        f"exit_code={exit_code}  duration={duration:.2f}s\n"
-    )
+    header = f"\n===== {label}: {command} =====\nexit_code={exit_code}  duration={duration:.2f}s\n"
     sections = [header]
     if stdout.strip():
         sections.append("--- stdout ---\n" + stdout.rstrip() + "\n")
@@ -429,16 +420,12 @@ def _append_evidence(
         fh.write("".join(sections))
 
 
-def _failure_update(
-    failed: list[tuple[str, int, str]], *, evidence_path: Path
-) -> dict:
+def _failure_update(failed: list[tuple[str, int, str]], *, evidence_path: Path) -> dict:
     summary_lines = []
     for cmd, exit_code, stderr in failed:
         line = f"`{cmd}` exit={exit_code}"
         if stderr:
-            line += f"\n  stderr (last {_STDERR_SNIPPET} chars):\n  " + stderr.replace(
-                "\n", "\n  "
-            )
+            line += f"\n  stderr (last {_STDERR_SNIPPET} chars):\n  " + stderr.replace("\n", "\n  ")
         summary_lines.append(line)
     summary = "\n\n".join(summary_lines)
     return {

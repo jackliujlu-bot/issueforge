@@ -100,7 +100,14 @@ def test_full_happy_path_passes(tmp_path: Path) -> None:
     shell = FakeShell(
         {
             ("gh", "auth", "status"): (0, "", "Logged in to github.com as alice"),
-            ("gh", "repo", "view", "acme/widget", "--json", "name,owner,visibility,defaultBranchRef"): (
+            (
+                "gh",
+                "repo",
+                "view",
+                "acme/widget",
+                "--json",
+                "name,owner,visibility,defaultBranchRef",
+            ): (
                 0,
                 '{"name":"widget","owner":{"login":"acme"},"defaultBranchRef":{"name":"main"}}',
                 "",
@@ -234,9 +241,7 @@ def test_local_checkout_passes_when_path_is_git(tmp_path: Path) -> None:
 
 def test_scaffold_inits_path_with_fix(tmp_path: Path) -> None:
     target = tmp_path / "newrepo"
-    cfg = _make_config(
-        tmp_path, project_mode="scaffold", sandbox="local", local_path=str(target)
-    )
+    cfg = _make_config(tmp_path, project_mode="scaffold", sandbox="local", local_path=str(target))
     git_inits: list[list[str]] = []
 
     def shell(cmd: list[str], *, cwd: Path | None = None, timeout: float = 30.0):

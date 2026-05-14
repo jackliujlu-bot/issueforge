@@ -156,8 +156,7 @@ def reviewer_node(ctx: NodeContext) -> ReviewerCallable:
                 "current_step": "reviewer_failed",
                 "scratch": scratch,
                 "last_error": (
-                    state.get("last_error")
-                    or "Reviewer rejected: coder produced no changes."
+                    state.get("last_error") or "Reviewer rejected: coder produced no changes."
                 ),
             }
 
@@ -217,9 +216,7 @@ def reviewer_node(ctx: NodeContext) -> ReviewerCallable:
     return _node
 
 
-def _build_prompt(
-    state: AgentState, *, diff: str, changed_files: list[str]
-) -> str:
+def _build_prompt(state: AgentState, *, diff: str, changed_files: list[str]) -> str:
     test_status = state.get("local_test_status", "unknown")
     test_summary = {
         "pass": "All configured lint/test commands passed.",
@@ -283,7 +280,9 @@ def _summarize_changed_files(diff_text: str, fallback: list[str]) -> str:
         nonlocal current_path, current_op, current_mode, current_mode_known, rename_from
         if current_path is None:
             return
-        mode_label = "symlink" if current_mode_known and current_mode == _GIT_MODE_SYMLINK else "regular"
+        mode_label = (
+            "symlink" if current_mode_known and current_mode == _GIT_MODE_SYMLINK else "regular"
+        )
         if not current_mode_known and current_op == "modified":
             mode_label = "regular"
         path = current_path
@@ -331,9 +330,7 @@ def _summarize_changed_files(diff_text: str, fallback: list[str]) -> str:
         if fallback:
             return "\n".join(f"- `{p}` — op=modified; mode=regular" for p in fallback)
         return "- (no files changed)"
-    return "\n".join(
-        f"- `{path}` — op={op}; mode={mode_label}" for path, op, mode_label in entries
-    )
+    return "\n".join(f"- `{path}` — op={op}; mode={mode_label}" for path, op, mode_label in entries)
 
 
 def _load_diff(patch_path: Path) -> str:

@@ -54,6 +54,7 @@ log = get_logger(__name__)
 
 # --------- shared option helper ------------------------------------------ #
 
+
 def _bootstrap(config_path: str | None, log_level: str | None) -> AppConfig:
     cfg = load_config(config_path=config_path)
     configure_logging(
@@ -70,6 +71,7 @@ LogOpt = typer.Option(None, "--log-level", help="Override log level (DEBUG/INFO/
 
 
 # --------- show-config --------------------------------------------------- #
+
 
 @app.command("show-config")
 def show_config(
@@ -107,6 +109,7 @@ def _format_value(value: object) -> str:
 
 # --------- list-executors ------------------------------------------------ #
 
+
 @app.command("list-executors")
 def list_executors(
     config_path: str | None = ConfigOpt,
@@ -136,6 +139,7 @@ def list_executors(
 
 
 # --------- run-once ------------------------------------------------------ #
+
 
 @app.command("run-once")
 def run_once(
@@ -196,6 +200,7 @@ def run_once(
 
 # --------- run-issue ----------------------------------------------------- #
 
+
 @app.command("run-issue")
 def run_issue(
     issue: int = typer.Option(..., "--issue", "-i", help="GitHub issue number."),
@@ -225,8 +230,7 @@ def run_issue(
             "restarted_after_close": "Prior workflow closed; restarted fresh",
         }.get(outcome, "Workflow dispatched")
         console.print(
-            f"[bold]{marker}:[/] {handle.id} on task queue "
-            f"{cfg.workflow.temporal.task_queue!r}"
+            f"[bold]{marker}:[/] {handle.id} on task queue {cfg.workflow.temporal.task_queue!r}"
         )
         if wait:
             result = await handle.result()
@@ -236,6 +240,7 @@ def run_issue(
 
 
 # --------- worker -------------------------------------------------------- #
+
 
 @app.command("worker")
 def worker_cmd(
@@ -269,9 +274,7 @@ def worker_cmd(
 
     override: bool | None = None
     if with_dispatcher and no_dispatcher:
-        raise typer.BadParameter(
-            "--with-dispatcher and --no-dispatcher are mutually exclusive."
-        )
+        raise typer.BadParameter("--with-dispatcher and --no-dispatcher are mutually exclusive.")
     if with_dispatcher:
         override = True
     elif no_dispatcher:
@@ -281,6 +284,7 @@ def worker_cmd(
 
 
 # --------- dispatcher --------------------------------------------------- #
+
 
 @app.command("dispatcher")
 def dispatcher_cmd(
@@ -378,6 +382,7 @@ def dispatcher_cmd(
 
 # --------- feishu-server ------------------------------------------------- #
 
+
 @app.command("feishu-server")
 def feishu_server(
     host: str = typer.Option("0.0.0.0", "--host"),
@@ -402,6 +407,7 @@ def feishu_server(
 
 # --------- artifact path helper (handy for debugging) ------------------- #
 
+
 @app.command("artifact-path")
 def artifact_path(
     issue: int = typer.Option(..., "--issue", "-i"),
@@ -420,17 +426,22 @@ def artifact_path(
 
 # --------- init (interactive wizard) ------------------------------------ #
 
+
 @app.command("init")
 def init_cmd(
     output: str | None = typer.Option(
-        None, "--output", "-o",
+        None,
+        "--output",
+        "-o",
         help="Where to write the project YAML (default: prompts you, suggests configs/<repo>.yaml).",
     ),
     no_dotenv: bool = typer.Option(
         False, "--no-dotenv", help="Don't update .env with AGENT_WORKER_CONFIG."
     ),
     use: str | None = typer.Option(
-        None, "--use", help="Skip menu/wizard and just use this YAML (e.g. configs/examples/generic-python.yaml)."
+        None,
+        "--use",
+        help="Skip menu/wizard and just use this YAML (e.g. configs/examples/generic-python.yaml).",
     ),
     log_level: str | None = LogOpt,
 ) -> None:
@@ -491,9 +502,7 @@ def init_cmd(
             f"[bold]{cloned.relative_to(project_root)}[/]."
         )
         _activate_yaml(cloned, project_root, no_dotenv=no_dotenv)
-        console.print(
-            f"  Edit it: [cyan]$EDITOR {cloned.relative_to(project_root)}[/]"
-        )
+        console.print(f"  Edit it: [cyan]$EDITOR {cloned.relative_to(project_root)}[/]")
         return
 
     # ---- Wizard path --------------------------------------------------- #
@@ -520,8 +529,7 @@ def init_cmd(
         "to apply safe auto-fixes (creates labels, clones repo, makes dirs)."
     )
     console.print(
-        "4. When doctor is green, run [bold cyan]agent-worker start[/] to "
-        "boot Temporal + worker."
+        "4. When doctor is green, run [bold cyan]agent-worker start[/] to boot Temporal + worker."
     )
 
 
@@ -532,24 +540,20 @@ def _activate_yaml(yaml_path: Path, project_root: Path, *, no_dotenv: bool) -> N
     rel = yaml_path.relative_to(project_root) if _is_inside(yaml_path, project_root) else yaml_path
     console.print(f"[green]✓[/] Selected [bold]{rel}[/].")
     if no_dotenv:
-        console.print(
-            f"  [dim]Set this in your shell:[/] export AGENT_WORKER_CONFIG={rel}"
-        )
+        console.print(f"  [dim]Set this in your shell:[/] export AGENT_WORKER_CONFIG={rel}")
         return
     env_path = project_root / ".env"
     update_dotenv(env_path, config_path=rel)
     os.environ["AGENT_WORKER_CONFIG"] = str(rel)
-    console.print(
-        f"[green]✓[/] Updated [bold].env[/] (AGENT_WORKER_CONFIG={rel})."
-    )
+    console.print(f"[green]✓[/] Updated [bold].env[/] (AGENT_WORKER_CONFIG={rel}).")
     console.print()
     console.print(
-        "Next: [cyan]agent-worker doctor[/] (or skip straight to "
-        "[cyan]agent-worker bootstrap[/])."
+        "Next: [cyan]agent-worker doctor[/] (or skip straight to [cyan]agent-worker bootstrap[/])."
     )
 
 
 # --------- doctor ------------------------------------------------------- #
+
 
 @app.command("doctor")
 def doctor_cmd(
@@ -614,32 +618,40 @@ def _render_doctor(result: object) -> None:
 
 # --------- bootstrap (the one command users have to know) -------------- #
 
+
 @app.command("bootstrap")
 def bootstrap_cmd(
     config_path: str | None = ConfigOpt,
     log_level: str | None = LogOpt,
     skip_init: bool = typer.Option(
-        False, "--skip-init",
+        False,
+        "--skip-init",
         help="Don't run the wizard even if AGENT_WORKER_CONFIG is unset.",
     ),
     full: bool = typer.Option(
-        False, "--full",
+        False,
+        "--full",
         help="Also run the FULL phase: docker compose up + Temporal worker + dispatch a real workflow (opens a real PR).",
     ),
     yes: bool = typer.Option(
-        False, "--yes", "-y",
+        False,
+        "--yes",
+        "-y",
         help="Don't ask for confirmation between phases (CI / scripted use).",
     ),
     test_issue: int | None = typer.Option(
-        None, "--test-issue",
+        None,
+        "--test-issue",
         help="Issue number to use for the LIVE_READ phase. Default: auto-discover the smallest open agent:todo issue.",
     ),
     no_live_read: bool = typer.Option(
-        False, "--no-live-read",
+        False,
+        "--no-live-read",
         help="Skip the LIVE_READ phase entirely. Useful on slow networks or for first-time setup against a brand-new repo with no issues yet.",
     ),
     live_read_timeout: float = typer.Option(
-        180.0, "--live-read-timeout",
+        180.0,
+        "--live-read-timeout",
         help="Hard cap (seconds) on the LIVE_READ planner round. Exceeding it is a WARN, not a FAIL — bootstrap continues.",
     ),
 ) -> None:
@@ -714,9 +726,12 @@ def bootstrap_cmd(
             env_path = project_root / answers.dotenv_path
             update_dotenv(
                 env_path,
-                config_path=yaml_path.relative_to(project_root) if _is_inside(yaml_path, project_root) else yaml_path,
+                config_path=yaml_path.relative_to(project_root)
+                if _is_inside(yaml_path, project_root)
+                else yaml_path,
             )
             from dotenv import load_dotenv
+
             load_dotenv(env_path, override=True)
         return yaml_path
 
@@ -729,15 +744,14 @@ def bootstrap_cmd(
 
         rel = (
             yaml_path.relative_to(project_root)
-            if _is_inside(yaml_path, project_root) else yaml_path
+            if _is_inside(yaml_path, project_root)
+            else yaml_path
         )
         env_path = project_root / ".env"
         update_dotenv(env_path, config_path=rel)
         os.environ["AGENT_WORKER_CONFIG"] = str(rel)
         load_dotenv(env_path, override=True)
-        console.print(
-            f"[green]✓[/] Pointing [bold].env[/] at [bold]{rel}[/]."
-        )
+        console.print(f"[green]✓[/] Pointing [bold].env[/] at [bold]{rel}[/].")
         return yaml_path
 
     def _config_loader() -> AppConfig:
@@ -818,9 +832,7 @@ def _render_bootstrap_summary(result: object) -> None:
         stopped = result.stopped_at
         console.print()
         if stopped:
-            console.print(
-                f"[bold red]✗ Bootstrap stopped at {stopped.name}.[/] {stopped.summary}"
-            )
+            console.print(f"[bold red]✗ Bootstrap stopped at {stopped.name}.[/] {stopped.summary}")
             if stopped.hint:
                 console.print(f"[dim]→ {stopped.hint}[/]")
 
@@ -880,6 +892,7 @@ class _RichBootstrapIO:
 
 # --------- start (convenience launcher) -------------------------------- #
 
+
 @app.command("start")
 def start_cmd(
     config_path: str | None = ConfigOpt,
@@ -888,10 +901,13 @@ def start_cmd(
         False, "--no-compose", help="Don't try to start docker compose."
     ),
     no_doctor: bool = typer.Option(
-        False, "--no-doctor", help="Skip the preflight check.",
+        False,
+        "--no-doctor",
+        help="Skip the preflight check.",
     ),
     foreground: bool = typer.Option(
-        True, "--foreground/--background",
+        True,
+        "--foreground/--background",
         help="Run the worker in the foreground (default) or as a detached process.",
     ),
 ) -> None:
@@ -919,20 +935,14 @@ def start_cmd(
     if not no_compose:
         compose_path = _project_root() / "docker-compose.yml"
         if not compose_path.exists():
-            console.print(
-                f"[yellow]No docker-compose.yml at {compose_path}; skipping.[/]"
-            )
+            console.print(f"[yellow]No docker-compose.yml at {compose_path}; skipping.[/]")
         elif not shutil.which("docker"):
             console.print("[yellow]docker not on PATH; skipping `docker compose up -d`.[/]")
         else:
             console.rule("[bold]docker compose up -d")
-            rc = subprocess.call(
-                ["docker", "compose", "up", "-d"], cwd=str(compose_path.parent)
-            )
+            rc = subprocess.call(["docker", "compose", "up", "-d"], cwd=str(compose_path.parent))
             if rc != 0:
-                console.print(
-                    "[yellow]docker compose returned non-zero; continuing anyway.[/]"
-                )
+                console.print("[yellow]docker compose returned non-zero; continuing anyway.[/]")
 
     console.rule("[bold]Starting Temporal worker")
     if foreground:
@@ -956,6 +966,7 @@ def start_cmd(
 
 
 # --------- helpers ------------------------------------------------------ #
+
 
 def _project_root() -> Path:
     """Return the directory used for relative ``configs/`` and ``.env`` paths.
@@ -1002,9 +1013,7 @@ class _RichWizardIO:
                 raw = ""
             value = raw or default
             if choices and value not in choices:
-                self._console.print(
-                    f"[red]Please enter one of: {', '.join(choices)}[/]"
-                )
+                self._console.print(f"[red]Please enter one of: {', '.join(choices)}[/]")
                 continue
             return value
 

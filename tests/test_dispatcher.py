@@ -31,7 +31,6 @@ from app.dispatcher.loop import (
 from app.github.ci_service import CIPollResult
 from app.github.issue_service import Issue
 
-
 # --------- fakes ------------------------------------------------------------ #
 
 
@@ -81,9 +80,7 @@ class _FakeIssuesAPI:
         to_label: str,
         from_labels: list[str] | None = None,
     ) -> None:
-        self.transitions.append(
-            (issue_number, to_label, tuple(from_labels or []))
-        )
+        self.transitions.append((issue_number, to_label, tuple(from_labels or [])))
 
 
 @dataclass
@@ -131,9 +128,7 @@ class _RecordingDispatcher:
         if issue_number in self.raise_for:
             raise RuntimeError(f"simulated dispatch failure for {issue_number}")
         outcome: Any = self.outcomes.get(issue_number, "started")
-        return _DispatchedHandle(
-            workflow_id=f"wf-{issue_number}", outcome=outcome
-        )
+        return _DispatchedHandle(workflow_id=f"wf-{issue_number}", outcome=outcome)
 
 
 @dataclass
@@ -248,9 +243,7 @@ async def test_dispatcher_dispatches_each_open_todo_issue() -> None:
 async def test_dispatcher_skips_running_workflow_as_noop_attach() -> None:
     """A workflow that is already RUNNING should be reported as attach, not start."""
     cfg = _make_config()
-    issues = _FakeIssuesAPI(
-        by_label={"agent-todo": [_FakeIssue(number=5, labels=["agent-todo"])]}
-    )
+    issues = _FakeIssuesAPI(by_label={"agent-todo": [_FakeIssue(number=5, labels=["agent-todo"])]})
     dispatcher = _RecordingDispatcher(outcomes={5: "attached_running"})
     deps, *_ = _make_deps(issues=issues, dispatcher=dispatcher)
     result = await run_one_iteration(
@@ -272,11 +265,7 @@ async def test_dispatcher_caps_dispatch_per_cycle() -> None:
     """
     cfg = _make_config()
     issues = _FakeIssuesAPI(
-        by_label={
-            "agent-todo": [
-                _FakeIssue(number=n, labels=["agent-todo"]) for n in range(1, 11)
-            ]
-        }
+        by_label={"agent-todo": [_FakeIssue(number=n, labels=["agent-todo"]) for n in range(1, 11)]}
     )
     deps, _, _, _, dispatcher, _ = _make_deps(issues=issues)
     result = await run_one_iteration(
@@ -329,9 +318,7 @@ async def test_blocked_with_passing_ci_marks_issue_done() -> None:
         prs_by_branch={"agent/issue-7": _FakePR(number=42, head_branch="agent/issue-7")}
     )
     ci = _FakeCIAPI(
-        polls_by_branch={
-            "agent/issue-7": CIPollResult(status="passed", completed=True)
-        }
+        polls_by_branch={"agent/issue-7": CIPollResult(status="passed", completed=True)}
     )
     deps, _, _, _, dispatcher, _ = _make_deps(issues=issues, prs=prs, ci=ci)
     result = await run_one_iteration(
@@ -389,9 +376,7 @@ async def test_blocked_with_pending_ci_leaves_issue_alone() -> None:
         prs_by_branch={"agent/issue-9": _FakePR(number=45, head_branch="agent/issue-9")}
     )
     ci = _FakeCIAPI(
-        polls_by_branch={
-            "agent/issue-9": CIPollResult(status="pending", completed=False)
-        }
+        polls_by_branch={"agent/issue-9": CIPollResult(status="pending", completed=False)}
     )
     deps, _, _, _, dispatcher, _ = _make_deps(issues=issues, prs=prs, ci=ci)
     result = await run_one_iteration(
@@ -438,40 +423,26 @@ async def test_blocked_recovery_throttles_per_issue() -> None:
         prs_by_branch={"agent/issue-11": _FakePR(number=46, head_branch="agent/issue-11")}
     )
     ci = _FakeCIAPI(
-        polls_by_branch={
-            "agent/issue-11": CIPollResult(status="failed", completed=True)
-        }
+        polls_by_branch={"agent/issue-11": CIPollResult(status="failed", completed=True)}
     )
     state = _RecoveryState()
     cycle_cfg = DispatcherConfig(blocked_recover_min_interval_seconds=600)
 
     # First cycle at t=1000: should re-dispatch.
-    deps_1, _, _, _, dispatcher_1, _ = _make_deps(
-        issues=issues, prs=prs, ci=ci, now_value=1000.0
-    )
-    r1 = await run_one_iteration(
-        config=cfg, dispatcher_config=cycle_cfg, deps=deps_1, state=state
-    )
+    deps_1, _, _, _, dispatcher_1, _ = _make_deps(issues=issues, prs=prs, ci=ci, now_value=1000.0)
+    r1 = await run_one_iteration(config=cfg, dispatcher_config=cycle_cfg, deps=deps_1, state=state)
     assert r1.stats.blocked_redispatched == 1
     assert dispatcher_1.calls == [11]
 
     # Second cycle at t=1100 (only 100s later): throttled, no action.
-    deps_2, _, _, _, dispatcher_2, _ = _make_deps(
-        issues=issues, prs=prs, ci=ci, now_value=1100.0
-    )
-    r2 = await run_one_iteration(
-        config=cfg, dispatcher_config=cycle_cfg, deps=deps_2, state=state
-    )
+    deps_2, _, _, _, dispatcher_2, _ = _make_deps(issues=issues, prs=prs, ci=ci, now_value=1100.0)
+    r2 = await run_one_iteration(config=cfg, dispatcher_config=cycle_cfg, deps=deps_2, state=state)
     assert r2.stats.blocked_skipped_throttled == 1
     assert dispatcher_2.calls == []
 
     # Third cycle at t=2000 (past the 600s throttle): re-dispatches again.
-    deps_3, _, _, _, dispatcher_3, _ = _make_deps(
-        issues=issues, prs=prs, ci=ci, now_value=2000.0
-    )
-    r3 = await run_one_iteration(
-        config=cfg, dispatcher_config=cycle_cfg, deps=deps_3, state=state
-    )
+    deps_3, _, _, _, dispatcher_3, _ = _make_deps(issues=issues, prs=prs, ci=ci, now_value=2000.0)
+    r3 = await run_one_iteration(config=cfg, dispatcher_config=cycle_cfg, deps=deps_3, state=state)
     assert r3.stats.blocked_redispatched == 1
     assert dispatcher_3.calls == [11]
 
@@ -486,9 +457,7 @@ async def test_blocked_recovery_off_when_auto_recover_disabled() -> None:
         prs_by_branch={"agent/issue-12": _FakePR(number=47, head_branch="agent/issue-12")}
     )
     ci = _FakeCIAPI(
-        polls_by_branch={
-            "agent/issue-12": CIPollResult(status="passed", completed=True)
-        }
+        polls_by_branch={"agent/issue-12": CIPollResult(status="passed", completed=True)}
     )
     deps, _, _, _, dispatcher, _ = _make_deps(issues=issues, prs=prs, ci=ci)
     result = await run_one_iteration(
@@ -530,9 +499,7 @@ async def test_orphan_absent_workflow_is_redispatched() -> None:
     """
     cfg = _make_config()
     issues = _FakeIssuesAPI(
-        by_label={
-            "agent-planning": [_FakeIssue(number=52, labels=["agent-planning"])]
-        }
+        by_label={"agent-planning": [_FakeIssue(number=52, labels=["agent-planning"])]}
     )
     wf_status = _RecordingWorkflowStatus(by_id={_wf_id(52): "absent"})
     deps, _, _, _, dispatcher, _ = _make_deps(issues=issues, workflow_status=wf_status)
@@ -553,9 +520,7 @@ async def test_orphan_running_workflow_is_left_alone() -> None:
     """A workflow that's still RUNNING is healthy — leave it."""
     cfg = _make_config()
     issues = _FakeIssuesAPI(
-        by_label={
-            "agent-coding": [_FakeIssue(number=80, labels=["agent-coding"])]
-        }
+        by_label={"agent-coding": [_FakeIssue(number=80, labels=["agent-coding"])]}
     )
     wf_status = _RecordingWorkflowStatus(by_id={_wf_id(80): "running"})
     deps, _, _, _, dispatcher, _ = _make_deps(issues=issues, workflow_status=wf_status)
@@ -580,9 +545,7 @@ async def test_orphan_closed_workflow_is_redispatched() -> None:
     """
     cfg = _make_config()
     issues = _FakeIssuesAPI(
-        by_label={
-            "agent-coding": [_FakeIssue(number=81, labels=["agent-coding"])]
-        }
+        by_label={"agent-coding": [_FakeIssue(number=81, labels=["agent-coding"])]}
     )
     wf_status = _RecordingWorkflowStatus(by_id={_wf_id(81): "failed"})
     dispatcher = _RecordingDispatcher(outcomes={81: "restarted_after_close"})
@@ -606,11 +569,7 @@ async def test_orphan_with_terminal_label_is_skipped() -> None:
     """
     cfg = _make_config()
     issues = _FakeIssuesAPI(
-        by_label={
-            "agent-coding": [
-                _FakeIssue(number=90, labels=["agent-coding", "agent-done"])
-            ]
-        }
+        by_label={"agent-coding": [_FakeIssue(number=90, labels=["agent-coding", "agent-done"])]}
     )
     wf_status = _RecordingWorkflowStatus(by_id={_wf_id(90): "completed"})
     deps, _, _, _, dispatcher, _ = _make_deps(issues=issues, workflow_status=wf_status)
@@ -632,12 +591,8 @@ async def test_orphan_dedupes_across_in_flight_labels() -> None:
     cfg = _make_config()
     issues = _FakeIssuesAPI(
         by_label={
-            "agent-coding": [
-                _FakeIssue(number=91, labels=["agent-coding", "agent-running"])
-            ],
-            "agent-running": [
-                _FakeIssue(number=91, labels=["agent-coding", "agent-running"])
-            ],
+            "agent-coding": [_FakeIssue(number=91, labels=["agent-coding", "agent-running"])],
+            "agent-running": [_FakeIssue(number=91, labels=["agent-coding", "agent-running"])],
         }
     )
     wf_status = _RecordingWorkflowStatus(by_id={_wf_id(91): "absent"})
@@ -659,9 +614,7 @@ async def test_orphan_scan_respects_throttle_within_window() -> None:
     only revive once."""
     cfg = _make_config()
     issues = _FakeIssuesAPI(
-        by_label={
-            "agent-planning": [_FakeIssue(number=70, labels=["agent-planning"])]
-        }
+        by_label={"agent-planning": [_FakeIssue(number=70, labels=["agent-planning"])]}
     )
     wf_status = _RecordingWorkflowStatus(by_id={_wf_id(70): "absent"})
     state = _RecoveryState()
@@ -674,9 +627,7 @@ async def test_orphan_scan_respects_throttle_within_window() -> None:
     deps_1, _, _, _, dispatcher_1, _ = _make_deps(
         issues=issues, workflow_status=wf_status, now_value=1000.0
     )
-    r1 = await run_one_iteration(
-        config=cfg, dispatcher_config=cycle_cfg, deps=deps_1, state=state
-    )
+    r1 = await run_one_iteration(config=cfg, dispatcher_config=cycle_cfg, deps=deps_1, state=state)
     assert r1.stats.orphan_revived == 1
     assert dispatcher_1.calls == [70]
 
@@ -684,9 +635,7 @@ async def test_orphan_scan_respects_throttle_within_window() -> None:
     deps_2, _, _, _, dispatcher_2, _ = _make_deps(
         issues=issues, workflow_status=wf_status, now_value=1100.0
     )
-    r2 = await run_one_iteration(
-        config=cfg, dispatcher_config=cycle_cfg, deps=deps_2, state=state
-    )
+    r2 = await run_one_iteration(config=cfg, dispatcher_config=cycle_cfg, deps=deps_2, state=state)
     assert r2.stats.orphan_revived == 0
     assert r2.stats.orphan_skipped_throttled == 1
     assert dispatcher_2.calls == []
@@ -695,9 +644,7 @@ async def test_orphan_scan_respects_throttle_within_window() -> None:
     deps_3, _, _, _, dispatcher_3, _ = _make_deps(
         issues=issues, workflow_status=wf_status, now_value=2000.0
     )
-    r3 = await run_one_iteration(
-        config=cfg, dispatcher_config=cycle_cfg, deps=deps_3, state=state
-    )
+    r3 = await run_one_iteration(config=cfg, dispatcher_config=cycle_cfg, deps=deps_3, state=state)
     assert r3.stats.orphan_revived == 1
     assert dispatcher_3.calls == [70]
 
@@ -708,9 +655,7 @@ async def test_orphan_scan_is_skipped_until_check_interval_elapses() -> None:
     so we don't burn the gh-API budget every 30s."""
     cfg = _make_config()
     issues = _FakeIssuesAPI(
-        by_label={
-            "agent-planning": [_FakeIssue(number=71, labels=["agent-planning"])]
-        }
+        by_label={"agent-planning": [_FakeIssue(number=71, labels=["agent-planning"])]}
     )
     wf_status = _RecordingWorkflowStatus(by_id={_wf_id(71): "absent"})
     state = _RecoveryState()
@@ -723,9 +668,7 @@ async def test_orphan_scan_is_skipped_until_check_interval_elapses() -> None:
     deps_1, _, _, _, _, wf_1 = _make_deps(
         issues=issues, workflow_status=wf_status, now_value=1000.0
     )
-    r1 = await run_one_iteration(
-        config=cfg, dispatcher_config=cycle_cfg, deps=deps_1, state=state
-    )
+    r1 = await run_one_iteration(config=cfg, dispatcher_config=cycle_cfg, deps=deps_1, state=state)
     assert r1.stats.orphan_scan_ran is True
     assert wf_1.calls == [_wf_id(71)]
 
@@ -734,9 +677,7 @@ async def test_orphan_scan_is_skipped_until_check_interval_elapses() -> None:
     deps_2, _, _, _, _, _ = _make_deps(
         issues=issues, workflow_status=fresh_status, now_value=1100.0
     )
-    r2 = await run_one_iteration(
-        config=cfg, dispatcher_config=cycle_cfg, deps=deps_2, state=state
-    )
+    r2 = await run_one_iteration(config=cfg, dispatcher_config=cycle_cfg, deps=deps_2, state=state)
     assert r2.stats.orphan_scan_ran is False
     assert fresh_status.calls == []  # the gh / temporal calls didn't even fire
 
@@ -745,9 +686,7 @@ async def test_orphan_scan_is_skipped_until_check_interval_elapses() -> None:
 async def test_orphan_revival_off_when_revive_orphans_disabled() -> None:
     cfg = _make_config()
     issues = _FakeIssuesAPI(
-        by_label={
-            "agent-planning": [_FakeIssue(number=72, labels=["agent-planning"])]
-        }
+        by_label={"agent-planning": [_FakeIssue(number=72, labels=["agent-planning"])]}
     )
     wf_status = _RecordingWorkflowStatus(by_id={_wf_id(72): "absent"})
     deps, _, _, _, dispatcher, _ = _make_deps(issues=issues, workflow_status=wf_status)
@@ -770,9 +709,7 @@ async def test_orphan_describe_failure_is_counted_as_error_not_revival() -> None
     """
     cfg = _make_config()
     issues = _FakeIssuesAPI(
-        by_label={
-            "agent-planning": [_FakeIssue(number=73, labels=["agent-planning"])]
-        }
+        by_label={"agent-planning": [_FakeIssue(number=73, labels=["agent-planning"])]}
     )
     wf_status = _RecordingWorkflowStatus(raise_for={_wf_id(73)})
     deps, _, _, _, dispatcher, _ = _make_deps(issues=issues, workflow_status=wf_status)
@@ -794,9 +731,7 @@ async def test_loop_runs_max_cycles_and_returns() -> None:
     from app.dispatcher import run_dispatcher_loop
 
     cfg = _make_config()
-    issues = _FakeIssuesAPI(
-        by_label={"agent-todo": [_FakeIssue(number=1, labels=["agent-todo"])]}
-    )
+    issues = _FakeIssuesAPI(by_label={"agent-todo": [_FakeIssue(number=1, labels=["agent-todo"])]})
     deps, _, _, _, dispatcher, _ = _make_deps(issues=issues)
     await run_dispatcher_loop(
         config=cfg,
@@ -814,9 +749,7 @@ async def test_loop_stops_when_stop_event_is_set() -> None:
     from app.dispatcher import run_dispatcher_loop
 
     cfg = _make_config()
-    issues = _FakeIssuesAPI(
-        by_label={"agent-todo": [_FakeIssue(number=1, labels=["agent-todo"])]}
-    )
+    issues = _FakeIssuesAPI(by_label={"agent-todo": [_FakeIssue(number=1, labels=["agent-todo"])]})
     deps, _, _, _, dispatcher, _ = _make_deps(issues=issues)
     stop = asyncio.Event()
 

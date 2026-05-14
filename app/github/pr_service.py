@@ -181,9 +181,14 @@ class GitHubPRService:
 
         remote = remote or self._repo.push_remote or "origin"
         base_args = [
-            "-c", f"http.lowSpeedLimit={_GIT_PUSH_LOW_SPEED_LIMIT}",
-            "-c", f"http.lowSpeedTime={_GIT_PUSH_LOW_SPEED_TIME}",
-            "push", "--set-upstream", remote, branch,
+            "-c",
+            f"http.lowSpeedLimit={_GIT_PUSH_LOW_SPEED_LIMIT}",
+            "-c",
+            f"http.lowSpeedTime={_GIT_PUSH_LOW_SPEED_TIME}",
+            "push",
+            "--set-upstream",
+            remote,
+            branch,
         ]
         if force:
             base_args.append("--force-with-lease")
@@ -289,9 +294,7 @@ class GitHubPRService:
         ]
         if draft_flag:
             args.append("--draft")
-        url = self._client.run_checked(
-            *args, input_text=body, timeout=120
-        ).strip()
+        url = self._client.run_checked(*args, input_text=body, timeout=120).strip()
         log.info("pr.create.ok", head=head_branch, base=base_branch, url=url)
         # `gh pr create` returns the URL on success; re-fetch to get the number.
         pr = self.find_for_branch(head_branch)

@@ -88,7 +88,9 @@ class DoctorResult:
 ShellRunner = Callable[..., tuple[int, str, str]]
 
 
-def _default_shell(cmd: list[str], *, cwd: Path | None = None, timeout: float = 30.0) -> tuple[int, str, str]:
+def _default_shell(
+    cmd: list[str], *, cwd: Path | None = None, timeout: float = 30.0
+) -> tuple[int, str, str]:
     try:
         completed = subprocess.run(
             cmd,
@@ -175,7 +177,7 @@ def _check_project(config: AppConfig) -> DoctorReport:
             outcome=CheckOutcome.WARN,
             detail=f"mode={mode}, no description set",
             hint=(
-                "Add `project.description: \"...\"` so the planner has standing "
+                'Add `project.description: "..."` so the planner has standing '
                 "context about what this worker is for."
             ),
         )
@@ -201,9 +203,7 @@ def _check_repo_identity(config: AppConfig) -> DoctorReport:
     )
 
 
-def _check_gh_present(
-    config: AppConfig, result: DoctorResult, runner: ShellRunner
-) -> bool:
+def _check_gh_present(config: AppConfig, result: DoctorResult, runner: ShellRunner) -> bool:
     binary = config.github.cli
     location = shutil.which(binary)
     if not location:
@@ -212,10 +212,7 @@ def _check_gh_present(
                 name="gh CLI installed",
                 outcome=CheckOutcome.FAIL,
                 detail=f"{binary!r} not on PATH",
-                hint=(
-                    "Install GitHub CLI from https://cli.github.com and run "
-                    "`gh auth login`."
-                ),
+                hint=("Install GitHub CLI from https://cli.github.com and run `gh auth login`."),
             )
         )
         return False
@@ -229,9 +226,7 @@ def _check_gh_present(
     return True
 
 
-def _check_gh_auth(
-    config: AppConfig, result: DoctorResult, runner: ShellRunner
-) -> bool:
+def _check_gh_auth(config: AppConfig, result: DoctorResult, runner: ShellRunner) -> bool:
     rc, stdout, stderr = runner([config.github.cli, "auth", "status"], timeout=15)
     if rc != 0:
         result.add(
@@ -258,9 +253,7 @@ def _check_gh_auth(
     return True
 
 
-def _check_repo_access(
-    config: AppConfig, result: DoctorResult, runner: ShellRunner
-) -> None:
+def _check_repo_access(config: AppConfig, result: DoctorResult, runner: ShellRunner) -> None:
     rc, stdout, stderr = runner(
         [
             config.github.cli,
@@ -289,9 +282,7 @@ def _check_repo_access(
         return
     try:
         payload = json.loads(stdout)
-        default_branch = (
-            payload.get("defaultBranchRef", {}).get("name", "?") if payload else "?"
-        )
+        default_branch = payload.get("defaultBranchRef", {}).get("name", "?") if payload else "?"
     except json.JSONDecodeError:
         default_branch = "?"
     result.add(
@@ -303,9 +294,7 @@ def _check_repo_access(
     )
 
 
-def _check_push_permission(
-    config: AppConfig, result: DoctorResult, runner: ShellRunner
-) -> None:
+def _check_push_permission(config: AppConfig, result: DoctorResult, runner: ShellRunner) -> None:
     rc, stdout, _ = runner(
         [
             config.github.cli,
@@ -554,10 +543,7 @@ def _check_local_path(
                 name="local checkout",
                 outcome=CheckOutcome.FAIL,
                 detail=f"{path} missing or not a git repo",
-                hint=(
-                    f"Run `agent-worker doctor --fix` to clone {clone_url} "
-                    f"into {path}."
-                ),
+                hint=(f"Run `agent-worker doctor --fix` to clone {clone_url} into {path}."),
             )
         )
         return
@@ -600,9 +586,7 @@ def _check_local_path(
     )
 
 
-def _check_base_branch(
-    config: AppConfig, result: DoctorResult, runner: ShellRunner
-) -> None:
+def _check_base_branch(config: AppConfig, result: DoctorResult, runner: ShellRunner) -> None:
     if not config.repo.local_path:
         result.add(
             DoctorReport(
@@ -646,9 +630,16 @@ def _check_base_branch(
 
 def _check_commands(config: AppConfig) -> DoctorReport:
     cmds = config.commands
-    populated = [name for name, value in
-                 (("setup", cmds.setup), ("lint", cmds.lint), ("test", cmds.test), ("build", cmds.build))
-                 if value]
+    populated = [
+        name
+        for name, value in (
+            ("setup", cmds.setup),
+            ("lint", cmds.lint),
+            ("test", cmds.test),
+            ("build", cmds.build),
+        )
+        if value
+    ]
     if config.project.mode == "scaffold":
         return DoctorReport(
             name="commands populated",

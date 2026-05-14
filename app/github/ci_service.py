@@ -24,9 +24,7 @@ from app.observability import get_logger
 
 log = get_logger(__name__)
 
-CIStatus = Literal[
-    "unknown", "queued", "in_progress", "success", "failure", "cancelled", "skipped"
-]
+CIStatus = Literal["unknown", "queued", "in_progress", "success", "failure", "cancelled", "skipped"]
 
 
 @dataclass
@@ -96,9 +94,7 @@ class GitHubCIService:
         substring) are filtered out before the judgment — useful for excluding
         human-gated workflows like a Codex-reviewed "Auto Merge" job.
         """
-        runs = self.list_runs_for_branch_or_pr(
-            pr_number=pr_number, head_branch=head_branch
-        )
+        runs = self.list_runs_for_branch_or_pr(pr_number=pr_number, head_branch=head_branch)
         if not runs:
             return CIPollResult(status="unknown", completed=False, runs=[])
 
@@ -142,9 +138,7 @@ class GitHubCIService:
             log_excerpts: dict[str, str] = {}
             for run in failed:
                 try:
-                    log_excerpts[run.workflow_name or str(run.id)] = (
-                        self.fetch_failure_logs(run.id)
-                    )
+                    log_excerpts[run.workflow_name or str(run.id)] = self.fetch_failure_logs(run.id)
                 except Exception as exc:  # gh CLI failure, network blip
                     log_excerpts[run.workflow_name or str(run.id)] = (
                         f"(failed to fetch logs: {exc})"
@@ -215,16 +209,16 @@ class GitHubCIService:
     def fetch_failure_logs(self, run_id: int) -> str:
         try:
             raw = self._client.run_checked(
-                "run", "view", str(run_id),
-                "--repo", self.repo_slug,
+                "run",
+                "view",
+                str(run_id),
+                "--repo",
+                self.repo_slug,
                 "--log-failed",
                 timeout=180,
             )
         except GhCommandError as exc:
-            return (
-                f"(could not fetch logs for run {run_id}: "
-                f"{exc.stderr.strip()[:200]})"
-            )
+            return f"(could not fetch logs for run {run_id}: {exc.stderr.strip()[:200]})"
         # Logs can be huge; clip the tail (failures are usually at the bottom).
         if len(raw) > _LOG_EXCERPT_CHARS:
             raw = "...[earlier output truncated]...\n" + raw[-_LOG_EXCERPT_CHARS:]

@@ -139,7 +139,9 @@ class GitWorktreeBackend:
                 "in your project YAML."
             )
 
-    def ensure(self, *, repo_slug: str, branch: str, base_branch: str, target_path: Path) -> Worktree:
+    def ensure(
+        self, *, repo_slug: str, branch: str, base_branch: str, target_path: Path
+    ) -> Worktree:
         target = Path(target_path).expanduser().resolve()
         target.parent.mkdir(parents=True, exist_ok=True)
 
@@ -266,9 +268,7 @@ class GitWorktreeBackend:
     def cleanup(self, worktree: Worktree) -> None:
         if not worktree.path.exists():
             return
-        rc, _, stderr = _git(
-            self.source_repo, "worktree", "remove", "--force", str(worktree.path)
-        )
+        rc, _, stderr = _git(self.source_repo, "worktree", "remove", "--force", str(worktree.path))
         if rc != 0:
             log.warning(
                 "worktree.remove_failed",
@@ -285,14 +285,10 @@ class GitWorktreeBackend:
         # cause ``git worktree add`` to try to attach to the remote ref.
         if not ref:
             return False
-        rc, _, _ = _git(
-            self.source_repo, "rev-parse", "--verify", "--quiet", f"refs/heads/{ref}"
-        )
+        rc, _, _ = _git(self.source_repo, "rev-parse", "--verify", "--quiet", f"refs/heads/{ref}")
         return rc == 0
 
-    def _resolve_branch(
-        self, ref: str, *, prefer_remote: bool = False
-    ) -> str | None:
+    def _resolve_branch(self, ref: str, *, prefer_remote: bool = False) -> str | None:
         """Return the most-specific ref that ``ref`` resolves to, or None.
 
         When ``prefer_remote=True`` (used for the agent's base branch), the
@@ -306,9 +302,7 @@ class GitWorktreeBackend:
         # Already-qualified refs (``feipeng/dev``, ``refs/remotes/foo/bar``)
         # always go through git's own resolution.
         if "/" in ref:
-            rc, _, _ = _git(
-                self.source_repo, "rev-parse", "--verify", "--quiet", ref
-            )
+            rc, _, _ = _git(self.source_repo, "rev-parse", "--verify", "--quiet", ref)
             if rc == 0:
                 return ref
 
@@ -330,9 +324,7 @@ class GitWorktreeBackend:
                     ordered.append(r)
             for remote in ordered:
                 candidate = f"refs/remotes/{remote}/{ref}"
-                rc, _, _ = _git(
-                    self.source_repo, "rev-parse", "--verify", "--quiet", candidate
-                )
+                rc, _, _ = _git(self.source_repo, "rev-parse", "--verify", "--quiet", candidate)
                 if rc == 0:
                     return f"{remote}/{ref}"
             return None
@@ -429,9 +421,7 @@ class WorktreeManager:
         # issue_key is already filesystem-safe (uses '--' as separator).
         return self.root / issue_key
 
-    def ensure(
-        self, *, repo_slug: str, branch: str, base_branch: str, issue_key: str
-    ) -> Worktree:
+    def ensure(self, *, repo_slug: str, branch: str, base_branch: str, issue_key: str) -> Worktree:
         target = self.path_for(issue_key)
         return self.backend.ensure(
             repo_slug=repo_slug,

@@ -45,9 +45,7 @@ async def run_worker(*, with_dispatcher: bool | None = None) -> None:
     configure_logging(level=config.system.log_level, fmt=config.system.log_format)
 
     dispatcher_enabled = (
-        with_dispatcher
-        if with_dispatcher is not None
-        else config.workflow.dispatcher.enabled
+        with_dispatcher if with_dispatcher is not None else config.workflow.dispatcher.enabled
     )
 
     client = await build_client(config)
@@ -90,7 +88,7 @@ async def run_worker(*, with_dispatcher: bool | None = None) -> None:
                 stop_event.set()
                 try:
                     await asyncio.wait_for(dispatcher_task, timeout=10)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     dispatcher_task.cancel()
                     try:
                         await dispatcher_task

@@ -47,9 +47,7 @@ def deliverer_node(ctx: NodeContext) -> DelivererCallable:
         service = GitHubPRService(ctx.config.repo, ctx.config.github)
         commit_message = _build_commit_message(state)
         try:
-            sha = service.commit_changes(
-                workspace, files=None, message=commit_message
-            )
+            sha = service.commit_changes(workspace, files=None, message=commit_message)
             service.push_branch(
                 workspace,
                 branch=branch,

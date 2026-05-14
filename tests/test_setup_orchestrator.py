@@ -22,7 +22,9 @@ from app.setup.orchestrator import (
 )
 
 
-def _green_shell(cmd: list[str], *, cwd: Path | None = None, timeout: float = 30.0) -> tuple[int, str, str]:
+def _green_shell(
+    cmd: list[str], *, cwd: Path | None = None, timeout: float = 30.0
+) -> tuple[int, str, str]:
     """Fake shell that makes every doctor preflight pass.
 
     Returns canned, well-formed responses for the gh/git probes the doctor
@@ -42,9 +44,18 @@ def _green_shell(cmd: list[str], *, cwd: Path | None = None, timeout: float = 30
     if cmd[:3] == ["gh", "label", "list"]:
         # Pretend every label is already present.
         names = [
-            "agent:todo", "agent:queued", "agent:running", "agent:planning",
-            "agent:coding", "agent:testing", "agent:pr-created", "agent:ci-running",
-            "agent:review", "agent:blocked", "agent:failed", "agent:done",
+            "agent:todo",
+            "agent:queued",
+            "agent:running",
+            "agent:planning",
+            "agent:coding",
+            "agent:testing",
+            "agent:pr-created",
+            "agent:ci-running",
+            "agent:review",
+            "agent:blocked",
+            "agent:failed",
+            "agent:done",
         ]
         body = ",".join(f'{{"name":"{n}"}}' for n in names)
         return (0, f"[{body}]", "")
@@ -75,7 +86,9 @@ class RecorderIO:
         for r in self.results:
             if r.name == name:
                 return r
-        raise AssertionError(f"phase {name!r} never finished. Got: {[r.name for r in self.results]}")
+        raise AssertionError(
+            f"phase {name!r} never finished. Got: {[r.name for r in self.results]}"
+        )
 
 
 @pytest.fixture
@@ -140,7 +153,10 @@ def test_config_phase_invokes_wizard_when_no_yaml(
                 "executor": {"default": "stub"},
                 "sandbox": {"mode": "local"},
                 "system": {"artifact_root": str(tmp_path / "runs")},
-                "langgraph": {"checkpoint_backend": "memory", "checkpoint_db": str(tmp_path / "lg.sqlite")},
+                "langgraph": {
+                    "checkpoint_backend": "memory",
+                    "checkpoint_db": str(tmp_path / "lg.sqlite"),
+                },
             }
         )
     )
@@ -188,9 +204,7 @@ def test_config_phase_fails_when_no_yaml_and_wizard_disabled(
     assert result.stopped_at.name == "CONFIG"
 
 
-def test_smoke_phase_runs_planner_round(
-    tmp_path: Path, configured_yaml: Path
-) -> None:
+def test_smoke_phase_runs_planner_round(tmp_path: Path, configured_yaml: Path) -> None:
     io = RecorderIO()
     run_bootstrap(
         io=io,
@@ -209,9 +223,7 @@ def test_smoke_phase_runs_planner_round(
     assert plan_path.stat().st_size > 0
 
 
-def test_live_read_skipped_when_user_declines(
-    tmp_path: Path, configured_yaml: Path
-) -> None:
+def test_live_read_skipped_when_user_declines(tmp_path: Path, configured_yaml: Path) -> None:
     io = RecorderIO(confirm_answer=False)
     # interactive=True forces the orchestrator to use io.confirm.
     run_bootstrap(
@@ -227,9 +239,7 @@ def test_live_read_skipped_when_user_declines(
     assert live.status == PhaseStatus.SKIP
 
 
-def test_no_live_read_flag_skips_live_read(
-    tmp_path: Path, configured_yaml: Path
-) -> None:
+def test_no_live_read_flag_skips_live_read(tmp_path: Path, configured_yaml: Path) -> None:
     io = RecorderIO()
     run_bootstrap(
         io=io,
@@ -269,21 +279,15 @@ def test_live_read_timeout_returns_warn_not_fail(
         _time.sleep(2.0)
         raise AssertionError("should have been cancelled by timeout")
 
-    monkeypatch.setattr(
-        "app.langgraph_app.graph.run_agent_round", conditional_slow
-    )
-    monkeypatch.setattr(
-        _orch, "_find_first_open_agent_todo_issue", lambda config: 1
-    )
+    monkeypatch.setattr("app.langgraph_app.graph.run_agent_round", conditional_slow)
+    monkeypatch.setattr(_orch, "_find_first_open_agent_todo_issue", lambda config: 1)
 
     from app.github.issue_service import Issue
 
     def fake_fetch(self, n):
         return Issue(number=n, title="t", body="b" * 50, labels=[], state="open")
 
-    monkeypatch.setattr(
-        "app.github.issue_service.GitHubIssueService.fetch", fake_fetch
-    )
+    monkeypatch.setattr("app.github.issue_service.GitHubIssueService.fetch", fake_fetch)
 
     io = RecorderIO()
     result = run_bootstrap(
@@ -314,12 +318,8 @@ def test_live_read_executor_crash_is_warn_not_fail(
             return _real_round(config=config, round_input=round_input)
         raise RuntimeError("simulated executor crash")
 
-    monkeypatch.setattr(
-        "app.langgraph_app.graph.run_agent_round", conditional_boom
-    )
-    monkeypatch.setattr(
-        _orch, "_find_first_open_agent_todo_issue", lambda config: 7
-    )
+    monkeypatch.setattr("app.langgraph_app.graph.run_agent_round", conditional_boom)
+    monkeypatch.setattr(_orch, "_find_first_open_agent_todo_issue", lambda config: 7)
 
     from app.github.issue_service import Issue
 
@@ -345,9 +345,7 @@ def test_live_read_executor_crash_is_warn_not_fail(
     assert any(p.name == "FULL" for p in result.phases)
 
 
-def test_full_phase_skipped_unless_full_flag(
-    tmp_path: Path, configured_yaml: Path
-) -> None:
+def test_full_phase_skipped_unless_full_flag(tmp_path: Path, configured_yaml: Path) -> None:
     io = RecorderIO()
     result = run_bootstrap(
         io=io,
@@ -364,9 +362,7 @@ def test_full_phase_skipped_unless_full_flag(
     assert "opt-in" in full.summary
 
 
-def test_preflight_fail_stops_chain(
-    tmp_path: Path, configured_yaml: Path
-) -> None:
+def test_preflight_fail_stops_chain(tmp_path: Path, configured_yaml: Path) -> None:
     """If doctor returns any FAIL, the chain stops and SMOKE never runs."""
 
     # A shell that makes the GitHub repo accessibility check fail loudly.

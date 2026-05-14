@@ -26,7 +26,9 @@ class _FakeGh(GhClient):
     def run(self, *args: str, input_text: str | None = None, timeout: float | None = 60.0):  # type: ignore[override]
         raise NotImplementedError
 
-    def run_checked(self, *args: str, input_text: str | None = None, timeout: float | None = 60.0) -> str:  # type: ignore[override]
+    def run_checked(
+        self, *args: str, input_text: str | None = None, timeout: float | None = 60.0
+    ) -> str:  # type: ignore[override]
         self.calls.append(args)
         key = " ".join(args[:3])
         if key in self.responses and isinstance(self.responses[key], str):
@@ -59,9 +61,7 @@ def test_ci_poll_pending_when_a_run_is_in_progress() -> None:
             ]
         }
     )
-    svc = GitHubCIService(
-        RepoConfig(owner="acme", name="widget"), GitHubConfig(), client=fake
-    )
+    svc = GitHubCIService(RepoConfig(owner="acme", name="widget"), GitHubConfig(), client=fake)
     poll = svc.poll(head_branch="agent/issue-1")
     assert poll.status == "pending"
     assert poll.completed is False
@@ -85,9 +85,7 @@ def test_ci_poll_passes_when_all_runs_succeeded() -> None:
             ]
         }
     )
-    svc = GitHubCIService(
-        RepoConfig(owner="acme", name="widget"), GitHubConfig(), client=fake
-    )
+    svc = GitHubCIService(RepoConfig(owner="acme", name="widget"), GitHubConfig(), client=fake)
     poll = svc.poll(head_branch="agent/issue-1")
     assert poll.status == "passed"
     assert poll.completed is True
@@ -121,9 +119,7 @@ def test_ci_poll_collapses_re_run_history_keeping_latest() -> None:
             ]
         }
     )
-    svc = GitHubCIService(
-        RepoConfig(owner="acme", name="widget"), GitHubConfig(), client=fake
-    )
+    svc = GitHubCIService(RepoConfig(owner="acme", name="widget"), GitHubConfig(), client=fake)
     poll = svc.poll(head_branch="agent/issue-1")
     assert poll.status == "passed", poll
 
@@ -147,9 +143,7 @@ def test_ci_poll_failed_pulls_log_excerpt() -> None:
             "run view 7": fake_logs,
         }
     )
-    svc = GitHubCIService(
-        RepoConfig(owner="acme", name="widget"), GitHubConfig(), client=fake
-    )
+    svc = GitHubCIService(RepoConfig(owner="acme", name="widget"), GitHubConfig(), client=fake)
     poll = svc.poll(head_branch="agent/issue-1")
     assert poll.status == "failed"
     assert poll.completed is True
@@ -159,9 +153,7 @@ def test_ci_poll_failed_pulls_log_excerpt() -> None:
 
 def test_ci_poll_unknown_when_no_runs_yet() -> None:
     fake = _FakeGh(responses={"run list --repo": []})
-    svc = GitHubCIService(
-        RepoConfig(owner="acme", name="widget"), GitHubConfig(), client=fake
-    )
+    svc = GitHubCIService(RepoConfig(owner="acme", name="widget"), GitHubConfig(), client=fake)
     poll = svc.poll(head_branch="agent/issue-1")
     assert poll.status == "unknown"
     assert poll.completed is False

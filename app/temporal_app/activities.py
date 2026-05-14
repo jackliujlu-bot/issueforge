@@ -98,6 +98,7 @@ class FetchCIStatusOutput:
 
 # --------- Implementations ------------------------------------------------- #
 
+
 class ActivityImpls:
     """Bound activity collection.
 
@@ -195,6 +196,7 @@ class ActivityImpls:
 
 
 # --------- Worker registration ------------------------------------------- #
+
 
 def build_activities(config: AppConfig | None = None) -> tuple[ActivityImpls, list[Any]]:
     """Return (impls, activity_callables) for ``Worker(activities=...)``.

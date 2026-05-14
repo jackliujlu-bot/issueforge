@@ -57,9 +57,7 @@ _DEFAULT_YAML: Path | None = None
 def _default_yaml_path() -> Path:
     global _DEFAULT_YAML
     if _DEFAULT_YAML is None:
-        _DEFAULT_YAML = (
-            Path(__file__).resolve().parent.parent.parent / "configs" / "default.yaml"
-        )
+        _DEFAULT_YAML = Path(__file__).resolve().parent.parent.parent / "configs" / "default.yaml"
     return _DEFAULT_YAML
 
 
@@ -79,11 +77,7 @@ def _deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]
     """Recursively merge ``overlay`` into ``base``. Lists are *replaced*, not concatenated."""
     out = deepcopy(base)
     for key, value in overlay.items():
-        if (
-            key in out
-            and isinstance(out[key], dict)
-            and isinstance(value, dict)
-        ):
+        if key in out and isinstance(out[key], dict) and isinstance(value, dict):
             out[key] = _deep_merge(out[key], value)
         else:
             out[key] = deepcopy(value)
@@ -180,8 +174,10 @@ def load_config(
 
     env_overlay, env_project_path = _env_overrides()
     project_path = (
-        Path(config_path) if config_path is not None
-        else Path(env_project_path) if env_project_path
+        Path(config_path)
+        if config_path is not None
+        else Path(env_project_path)
+        if env_project_path
         else None
     )
     project_overlay = _read_yaml(project_path) if project_path else {}

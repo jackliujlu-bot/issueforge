@@ -165,9 +165,7 @@ def run_bootstrap(
         "(No comments are posted, no PR is opened.)",
         default=True,
     ):
-        skipped = PhaseResult(
-            name="LIVE_READ", status=PhaseStatus.SKIP, summary="user declined"
-        )
+        skipped = PhaseResult(name="LIVE_READ", status=PhaseStatus.SKIP, summary="user declined")
         io.phase_start("LIVE_READ", "Plan against a real GitHub issue (skipped by user)")
         io.phase_finish(skipped)
         result.phases.append(skipped)
@@ -196,13 +194,10 @@ def run_bootstrap(
         return result
 
     if interactive and not io.confirm(
-        "Start Temporal + worker and dispatch a real workflow now? "
-        "This will create a real PR.",
+        "Start Temporal + worker and dispatch a real workflow now? This will create a real PR.",
         default=False,
     ):
-        skipped = PhaseResult(
-            name="FULL", status=PhaseStatus.SKIP, summary="user declined"
-        )
+        skipped = PhaseResult(name="FULL", status=PhaseStatus.SKIP, summary="user declined")
         io.phase_start("FULL", "Skipped by user")
         io.phase_finish(skipped)
         result.phases.append(skipped)
@@ -248,10 +243,7 @@ def _phase_config(
             name="CONFIG",
             status=PhaseStatus.FAIL,
             summary="No project YAML configured and wizard disabled",
-            hint=(
-                "Either run `agent-worker init` first, or rerun without "
-                "--skip-init."
-            ),
+            hint=("Either run `agent-worker init` first, or rerun without --skip-init."),
         )
         result.elapsed_seconds = time.monotonic() - started
         io.phase_finish(result)
@@ -277,9 +269,7 @@ def _phase_config(
     return result
 
 
-def _phase_preflight(
-    io: IO, config: AppConfig, *, shell: ShellRunner | None = None
-) -> PhaseResult:
+def _phase_preflight(io: IO, config: AppConfig, *, shell: ShellRunner | None = None) -> PhaseResult:
     io.phase_start("PREFLIGHT", "Validate prerequisites and apply safe auto-fixes")
     started = time.monotonic()
 
@@ -413,9 +403,7 @@ def _phase_live_read(
     return WARN (not FAIL) so the chain continues — bootstrap's job is
     "verify plumbing", not "wait arbitrarily long".
     """
-    io.phase_start(
-        "LIVE_READ", "Plan against a real GitHub issue (no comment, no PR)"
-    )
+    io.phase_start("LIVE_READ", "Plan against a real GitHub issue (no comment, no PR)")
     started = time.monotonic()
 
     from app.github._gh_cli import GhCommandError
@@ -453,10 +441,10 @@ def _phase_live_read(
             status=PhaseStatus.FAIL,
             summary=f"could not fetch issue #{chosen}",
             detail=(exc.stderr or exc.stdout or str(exc)).strip().splitlines()[0]
-            if (exc.stderr or exc.stdout) else str(exc),
+            if (exc.stderr or exc.stdout)
+            else str(exc),
             hint=(
-                f"Confirm `gh issue view {chosen} --repo {config.repo.slug}` "
-                "works in your shell."
+                f"Confirm `gh issue view {chosen} --repo {config.repo.slug}` works in your shell."
             ),
         )
         result.elapsed_seconds = time.monotonic() - started
@@ -465,6 +453,7 @@ def _phase_live_read(
 
     # Build a planning-only config so we never shell out / push branches.
     from app.config.models import AppConfig as _AppConfig
+
     overlay = config.model_dump(mode="python")
     overlay["workflow"]["stop_after"] = "planning"
     overlay["sandbox"]["mode"] = "local"
@@ -564,9 +553,7 @@ def _phase_full(io: IO, config: AppConfig, *, project_root: Path) -> PhaseResult
     The worker runs in the background; we leave it alive on success so the
     user can keep dispatching issues afterward.
     """
-    io.phase_start(
-        "FULL", "Bring up Temporal + worker + dispatch a real workflow"
-    )
+    io.phase_start("FULL", "Bring up Temporal + worker + dispatch a real workflow")
     started = time.monotonic()
 
     # 1. docker compose up -d (if available)
@@ -596,9 +583,7 @@ def _phase_full(io: IO, config: AppConfig, *, project_root: Path) -> PhaseResult
         return result
 
     io.info("$ docker compose up -d")
-    rc = subprocess.call(
-        ["docker", "compose", "up", "-d"], cwd=str(compose_path.parent)
-    )
+    rc = subprocess.call(["docker", "compose", "up", "-d"], cwd=str(compose_path.parent))
     if rc != 0:
         result = PhaseResult(
             name="FULL",

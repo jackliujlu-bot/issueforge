@@ -117,9 +117,7 @@ def _build_comment(
     changed_files = state.get("changed_files") or []
     if changed_files:
         sections.append(
-            "### Files changed\n\n"
-            + "\n".join(f"- `{f}`" for f in changed_files)
-            + "\n\n"
+            "### Files changed\n\n" + "\n".join(f"- `{f}`" for f in changed_files) + "\n\n"
         )
 
     test_status = state.get("local_test_status", "unknown")
@@ -128,26 +126,26 @@ def _build_comment(
         if test_status == "pass":
             sections.append(":white_check_mark: All configured lint/test commands passed.\n\n")
         elif test_status == "fail":
-            sections.append(":x: One or more verification commands failed; "
-                          "see `evidence/local_tests.log` in the artifact tree.\n\n")
+            sections.append(
+                ":x: One or more verification commands failed; "
+                "see `evidence/local_tests.log` in the artifact tree.\n\n"
+            )
         else:
             sections.append("_No tests were run (commands.test / commands.lint empty)._\n\n")
 
     review_verdict = (state.get("scratch") or {}).get("review_verdict", "")
     if review_verdict:
         if review_verdict == "pass":
-            sections.append("### Self-review\n\n:white_check_mark: PASS — see `review/self_review.md`.\n\n")
+            sections.append(
+                "### Self-review\n\n:white_check_mark: PASS — see `review/self_review.md`.\n\n"
+            )
         else:
             sections.append("### Self-review\n\n:warning: FAIL — see `review/self_review.md`.\n\n")
 
     pr_number = state.get("pr_number")
     pr_url = (state.get("scratch") or {}).get("pr_url", "")
     if pr_number or pr_url:
-        sections.append(
-            "### Pull request\n\n"
-            f"- number: #{pr_number}\n"
-            f"- url: {pr_url}\n\n"
-        )
+        sections.append(f"### Pull request\n\n- number: #{pr_number}\n- url: {pr_url}\n\n")
 
     if stop_after == "planning":
         sections.append(

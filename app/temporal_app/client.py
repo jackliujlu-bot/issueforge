@@ -40,8 +40,14 @@ async def build_client(config: AppConfig) -> Client:
 # reset — the agent issue's label is still in-flight but no workflow exists
 # to drive it forward, i.e. the orphan case).
 WorkflowStatusLabel = Literal[
-    "running", "completed", "failed", "canceled", "terminated",
-    "continued_as_new", "timed_out", "absent",
+    "running",
+    "completed",
+    "failed",
+    "canceled",
+    "terminated",
+    "continued_as_new",
+    "timed_out",
+    "absent",
 ]
 
 
@@ -63,9 +69,7 @@ async def describe_workflow_status(
         handle = cli.get_workflow_handle(workflow_id)
         desc = await handle.describe()
     except Exception as exc:
-        log.debug(
-            "workflow.describe_absent", workflow_id=workflow_id, error=str(exc)
-        )
+        log.debug("workflow.describe_absent", workflow_id=workflow_id, error=str(exc))
         return "absent"
 
     status = desc.status

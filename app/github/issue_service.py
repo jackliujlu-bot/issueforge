@@ -70,9 +70,7 @@ class GitHubIssueService:
             raw=payload,
         )
 
-    def list_open_with_label(
-        self, label: str, *, limit: int = 100
-    ) -> list[Issue]:
+    def list_open_with_label(self, label: str, *, limit: int = 100) -> list[Issue]:
         """Return open issues carrying ``label`` (no body fetch, light JSON).
 
         Used by the dispatcher to scan for tasks. We deliberately don't pull

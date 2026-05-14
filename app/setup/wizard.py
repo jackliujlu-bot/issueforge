@@ -257,14 +257,11 @@ def run_wizard(
     answers.commands_test = _ask_command_list(
         io, "Test commands (gates the tester node)", suggestion.test
     )
-    answers.commands_build = _ask_command_list(
-        io, "Build commands (optional)", suggestion.build
-    )
+    answers.commands_build = _ask_command_list(io, "Build commands (optional)", suggestion.build)
 
     # ---- Executor ------------------------------------------------------- #
     answers.executor_default = io.ask(
-        "Default code executor (cursor = cursor-agent CLI; stub = no-op for "
-        "smoke tests)",
+        "Default code executor (cursor = cursor-agent CLI; stub = no-op for smoke tests)",
         default="cursor",
         choices=KNOWN_EXECUTORS,
     )
@@ -311,9 +308,7 @@ def _suggest_commands(local_path: str, *, project_mode: str) -> CommandSuggestio
     return detect_commands(path)
 
 
-def _ask_command_list(
-    io: WizardIO, label: str, suggested: list[str]
-) -> list[str]:
+def _ask_command_list(io: WizardIO, label: str, suggested: list[str]) -> list[str]:
     """Prompt for a comma-separated command list, defaulting to ``suggested``."""
     default_str = " ; ".join(suggested)
     raw = io.ask(
@@ -370,9 +365,7 @@ def discover_existing_configs(project_root: Path) -> list[ConfigPreview]:
     return previews
 
 
-def choose_config_strategy(
-    io: WizardIO, project_root: Path
-) -> ConfigChoice:
+def choose_config_strategy(io: WizardIO, project_root: Path) -> ConfigChoice:
     """Top-level menu shown by ``init`` / ``bootstrap`` before the wizard.
 
     If ``configs/`` already has at least one usable overlay, the user gets:
@@ -386,9 +379,7 @@ def choose_config_strategy(
     """
     previews = discover_existing_configs(project_root)
     if not previews:
-        io.info(
-            "No existing project YAMLs in configs/ — running the wizard."
-        )
+        io.info("No existing project YAMLs in configs/ — running the wizard.")
         return ConfigChoice(strategy="wizard")
 
     io.info("Found existing project YAMLs in configs/:")
@@ -416,15 +407,11 @@ def choose_config_strategy(
                 f"New filename under configs/ (e.g. my-{base.path.stem.replace('example-', '')}.yaml)",
                 default=_suggest_clone_name(base.path, previews),
             )
-            return ConfigChoice(
-                strategy="clone_and_edit", source_path=base.path, new_name=new_name
-            )
+            return ConfigChoice(strategy="clone_and_edit", source_path=base.path, new_name=new_name)
         if choice.isdigit():
             idx = int(choice)
             if 1 <= idx <= len(previews):
-                return ConfigChoice(
-                    strategy="use_existing", source_path=previews[idx - 1].path
-                )
+                return ConfigChoice(strategy="use_existing", source_path=previews[idx - 1].path)
         io.info(f"Unrecognized choice {choice!r}; try again.")
 
 
@@ -454,9 +441,7 @@ def _suggest_clone_name(source: Path, existing: list[ConfigPreview]) -> str:
     return f"my-{stem}-{n}.yaml"
 
 
-def clone_existing_yaml(
-    source: Path, *, new_name: str, project_root: Path
-) -> Path:
+def clone_existing_yaml(source: Path, *, new_name: str, project_root: Path) -> Path:
     """Copy ``source`` to ``configs/<new_name>``. Returns the destination."""
     if not new_name.endswith(".yaml"):
         new_name = f"{new_name}.yaml"

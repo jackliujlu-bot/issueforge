@@ -230,9 +230,7 @@ def test_git_worktree_backend_prefers_remote_when_local_main_diverged(
         "commit — should have used origin/main instead"
     )
     # And the base_ref should be the remote-tracking ref.
-    assert wt.base_ref == "origin/main", (
-        f"expected base_ref to be origin/main, got {wt.base_ref!r}"
-    )
+    assert wt.base_ref == "origin/main", f"expected base_ref to be origin/main, got {wt.base_ref!r}"
 
 
 def test_git_worktree_backend_falls_back_when_no_remote(tmp_path: Path) -> None:
@@ -266,9 +264,7 @@ def test_git_worktree_backend_skip_fetch_when_auto_fetch_disabled(
     subprocess.run(["git", "add", "local_only.txt"], cwd=src, check=True)
     subprocess.run(["git", "commit", "-qm", "local-only commit"], cwd=src, check=True)
 
-    backend = GitWorktreeBackend(
-        src, preferred_remote="origin", auto_fetch_base=False
-    )
+    backend = GitWorktreeBackend(src, preferred_remote="origin", auto_fetch_base=False)
     wt = backend.ensure(
         repo_slug="acme/widget",
         branch="agent/issue-1",
@@ -369,9 +365,7 @@ def test_tester_changed_py_files_filters_to_python_only(tmp_path: Path) -> None:
     )
     assert subs.changed_py_files == ["src/foo.py", "src/bar.py"]
 
-    resolved = _resolve_command(
-        "uv run ruff check {changed_py_files}", subs
-    )
+    resolved = _resolve_command("uv run ruff check {changed_py_files}", subs)
     assert resolved.command == "uv run ruff check src/foo.py src/bar.py"
 
 
@@ -432,9 +426,7 @@ def test_tester_derives_test_targets_from_changed_source_files(tmp_path: Path) -
     (workspace / "tests" / "test_foo.py").write_text("def test_f(): pass\n")
     (workspace / "README.md").write_text("hi\n")
 
-    subs = _build_substitutions(
-        changed_files=["src/foo.py", "README.md"], workspace=workspace
-    )
+    subs = _build_substitutions(changed_files=["src/foo.py", "README.md"], workspace=workspace)
     # README.md doesn't have a test, foo.py does → only one target.
     assert subs.test_targets == ["tests/test_foo.py"]
 
@@ -495,9 +487,7 @@ def test_tester_quotes_paths_with_spaces(tmp_path: Path) -> None:
     doesn't break the whole command line."""
     from app.langgraph_app.nodes.tester import _build_substitutions, _resolve_command
 
-    subs = _build_substitutions(
-        changed_files=["weird path/foo bar.py"], workspace=tmp_path
-    )
+    subs = _build_substitutions(changed_files=["weird path/foo bar.py"], workspace=tmp_path)
     resolved = _resolve_command("uv run ruff check {changed_files}", subs)
     assert "'weird path/foo bar.py'" in resolved.command
 
@@ -521,7 +511,9 @@ def test_tester_end_to_end_targeted_runs_only_matched_tests(tmp_path: Path) -> N
     (wt.path / "src").mkdir()
     (wt.path / "src" / "foo.py").write_text("def f(): return 1\n")
     (wt.path / "tests").mkdir()
-    (wt.path / "tests" / "test_foo.py").write_text("from src.foo import f\ndef test_f(): assert f() == 1\n")
+    (wt.path / "tests" / "test_foo.py").write_text(
+        "from src.foo import f\ndef test_f(): assert f() == 1\n"
+    )
 
     shell = _RecordingExecutor(
         ExecutorEntry(enabled=True),
@@ -580,9 +572,7 @@ def test_coder_runs_setup_commands_once_per_worktree(tmp_path: Path) -> None:
     assert update["current_step"] == "coder_done"
     workspace = Path(update["workspace_path"])
     expected_marker = _setup_marker_path(ctx)
-    assert expected_marker.exists(), (
-        f"coder must drop the setup-done marker at {expected_marker}"
-    )
+    assert expected_marker.exists(), f"coder must drop the setup-done marker at {expected_marker}"
     assert not (workspace / WORKSPACE_SETUP_MARKER).exists(), (
         "marker MUST NOT live inside the worktree — that pollutes git diff "
         "and trips the reviewer (regression for #55)"
@@ -631,9 +621,7 @@ def test_coder_bails_with_setup_failed_when_setup_command_errors(tmp_path: Path)
     assert update["current_step"] == "setup_failed"
     assert "Workspace setup failed" in update["last_error"]
     assert "uv sync" in update["last_error"]
-    assert executor.calls == [], (
-        "coder executor must not be invoked when setup has failed"
-    )
+    assert executor.calls == [], "coder executor must not be invoked when setup has failed"
 
 
 def test_coder_skips_setup_when_no_commands_configured(tmp_path: Path) -> None:
@@ -891,16 +879,11 @@ def test_full_round_stop_after_testing_real_shell(
             if request.kind == "plan":
                 return ExecutorResult(
                     ok=True,
-                    output=(
-                        "## Objective\nDo the thing\n\n"
-                        "## Subtasks\n- T1: foo\n"
-                    ),
+                    output=("## Objective\nDo the thing\n\n## Subtasks\n- T1: foo\n"),
                 )
             if request.workspace is not None:
                 (request.workspace / "out.txt").write_text("hi\n")
-                subprocess.run(
-                    ["git", "add", "-N", "out.txt"], cwd=request.workspace, check=False
-                )
+                subprocess.run(["git", "add", "-N", "out.txt"], cwd=request.workspace, check=False)
             return ExecutorResult(
                 ok=True,
                 output="SUMMARY: wrote out.txt\nVERDICT: PASS",
@@ -1012,8 +995,7 @@ def test_plan_prompt_template_renders_with_state_keys() -> None:
     )
     assert "/tmp/checkout" in rendered
     assert "{" not in rendered.replace("{}", ""), (
-        "PLAN_PROMPT_TEMPLATE has an unfilled {placeholder}; planner_node "
-        "will KeyError at runtime."
+        "PLAN_PROMPT_TEMPLATE has an unfilled {placeholder}; planner_node will KeyError at runtime."
     )
 
 

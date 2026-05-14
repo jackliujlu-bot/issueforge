@@ -150,38 +150,42 @@ class IssueAgentWorkflow:
             final = round_result.final_status
 
             if final == "failed":
-                await self._transition_terminal(
-                    params, retry, target=params.label_failed
-                )
+                await self._transition_terminal(params, retry, target=params.label_failed)
                 return self._result(
-                    final, params.issue_number, last_error, last_pr_number,
-                    last_pr_url, rounds_used,
+                    final,
+                    params.issue_number,
+                    last_error,
+                    last_pr_number,
+                    last_pr_url,
+                    rounds_used,
                 )
 
             if final == "planning_done":
-                await self._transition_terminal(
-                    params, retry, target=params.label_blocked
-                )
+                await self._transition_terminal(params, retry, target=params.label_blocked)
                 return self._result(
-                    final, params.issue_number, last_error, last_pr_number,
-                    last_pr_url, rounds_used,
+                    final,
+                    params.issue_number,
+                    last_error,
+                    last_pr_number,
+                    last_pr_url,
+                    rounds_used,
                 )
 
             if final == "ready_for_review":
                 # Phase 2 stop (no deliverer ran).
-                await self._transition_terminal(
-                    params, retry, target=params.label_review
-                )
+                await self._transition_terminal(params, retry, target=params.label_review)
                 return self._result(
-                    final, params.issue_number, last_error, last_pr_number,
-                    last_pr_url, rounds_used,
+                    final,
+                    params.issue_number,
+                    last_error,
+                    last_pr_number,
+                    last_pr_url,
+                    rounds_used,
                 )
 
             if final == "pr_created":
                 # Phase 3+4: PR opened → wait for CI to settle.
-                await self._transition_terminal(
-                    params, retry, target=params.label_ci_running
-                )
+                await self._transition_terminal(params, retry, target=params.label_ci_running)
                 ci_outcome, ci_summary = await self._wait_for_ci(
                     params=params,
                     pr_number=last_pr_number or 0,
@@ -189,49 +193,52 @@ class IssueAgentWorkflow:
                     retry=retry,
                 )
                 if ci_outcome == "passed":
-                    await self._transition_terminal(
-                        params, retry, target=params.label_done
-                    )
+                    await self._transition_terminal(params, retry, target=params.label_done)
                     return self._result(
-                        "done", params.issue_number, "", last_pr_number,
-                        last_pr_url, rounds_used,
+                        "done",
+                        params.issue_number,
+                        "",
+                        last_pr_number,
+                        last_pr_url,
+                        rounds_used,
                     )
                 if ci_outcome == "timeout":
-                    await self._transition_terminal(
-                        params, retry, target=params.label_blocked
-                    )
+                    await self._transition_terminal(params, retry, target=params.label_blocked)
                     return self._result(
-                        "blocked", params.issue_number,
+                        "blocked",
+                        params.issue_number,
                         "CI did not complete within ci_max_wait_seconds.",
-                        last_pr_number, last_pr_url, rounds_used,
+                        last_pr_number,
+                        last_pr_url,
+                        rounds_used,
                     )
                 # ci_outcome == "failed": feed CI summary back into next round.
                 prior_failure = ci_summary
                 if rounds_used >= params.max_agent_rounds:
                     break
-                await self._transition_terminal(
-                    params, retry, target=params.label_coding
-                )
+                await self._transition_terminal(params, retry, target=params.label_coding)
                 continue
 
             # Unknown / unhandled final_status — bail loudly.
-            await self._transition_terminal(
-                params, retry, target=params.label_failed
-            )
+            await self._transition_terminal(params, retry, target=params.label_failed)
             return self._result(
-                "failed", params.issue_number,
+                "failed",
+                params.issue_number,
                 f"Unhandled final_status={final!r}",
-                last_pr_number, last_pr_url, rounds_used,
+                last_pr_number,
+                last_pr_url,
+                rounds_used,
             )
 
         # Exhausted retry budget.
-        await self._transition_terminal(
-            params, retry, target=params.label_failed
-        )
+        await self._transition_terminal(params, retry, target=params.label_failed)
         return self._result(
-            "failed", params.issue_number,
+            "failed",
+            params.issue_number,
             f"Exhausted {params.max_agent_rounds} rounds; last_error={last_error}",
-            last_pr_number, last_pr_url, rounds_used,
+            last_pr_number,
+            last_pr_url,
+            rounds_used,
         )
 
     # ---------- helpers ------------------------------------------------- #

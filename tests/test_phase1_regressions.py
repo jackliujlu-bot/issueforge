@@ -109,9 +109,7 @@ def test_handoff_md_records_the_final_status_returned_by_reporter(
         ),
     )
 
-    handoff = (
-        tmp_path / "runs" / "acme--widget--issue-99" / "handoff.md"
-    ).read_text()
+    handoff = (tmp_path / "runs" / "acme--widget--issue-99" / "handoff.md").read_text()
 
     assert out.final_status == "planning_done"
     assert f"- final_status: {out.final_status}" in handoff, (

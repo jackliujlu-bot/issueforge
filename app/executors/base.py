@@ -99,9 +99,7 @@ class CodeExecutor(ABC):
 _REGISTRY: dict[str, Callable[[ExecutorEntry], CodeExecutor]] = {}
 
 
-def register_executor(
-    name: str, factory: Callable[[ExecutorEntry], CodeExecutor]
-) -> None:
+def register_executor(name: str, factory: Callable[[ExecutorEntry], CodeExecutor]) -> None:
     """Register a new executor backend.
 
     Idempotent: registering the same name twice replaces the prior factory so
@@ -113,9 +111,7 @@ def register_executor(
 def build_executor(name: str, config: AppConfig) -> CodeExecutor:
     """Construct an executor by name from an :class:`AppConfig`."""
     if name not in _REGISTRY:
-        raise UnknownExecutorError(
-            f"Unknown executor {name!r}. Registered: {sorted(_REGISTRY)}"
-        )
+        raise UnknownExecutorError(f"Unknown executor {name!r}. Registered: {sorted(_REGISTRY)}")
     entry = config.executor.entry(name)
     if not entry.enabled:
         raise UnknownExecutorError(

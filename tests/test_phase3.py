@@ -46,9 +46,7 @@ def _make_repo_with_origin(tmp_path: Path) -> tuple[Path, Path]:
     (repo / "README.md").write_text("hello\n")
     subprocess.run(["git", "add", "."], cwd=repo, check=True)
     subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=repo, check=True)
-    subprocess.run(
-        ["git", "remote", "add", "origin", str(bare)], cwd=repo, check=True
-    )
+    subprocess.run(["git", "remote", "add", "origin", str(bare)], cwd=repo, check=True)
     subprocess.run(["git", "push", "-q", "-u", "origin", "main"], cwd=repo, check=True)
     return repo, bare
 
@@ -64,7 +62,9 @@ class _FakeGh(GhClient):
     def run(self, *args: str, input_text: str | None = None, timeout: float | None = 60.0):  # type: ignore[override]
         raise NotImplementedError("not used in tests")
 
-    def run_checked(self, *args: str, input_text: str | None = None, timeout: float | None = 60.0) -> str:  # type: ignore[override]
+    def run_checked(
+        self, *args: str, input_text: str | None = None, timeout: float | None = 60.0
+    ) -> str:  # type: ignore[override]
         self.calls.append(args)
         self.inputs.append(input_text)
         key = " ".join(args[:3])
